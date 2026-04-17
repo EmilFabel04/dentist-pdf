@@ -32,7 +32,7 @@ export default function Home() {
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const [uploadProgress, setUploadProgress] = useState(0);
+  // Upload progress not supported by this @vercel/blob version — using indeterminate state
   const [phase, setPhase] = useState<Phase>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -114,14 +114,12 @@ export default function Home() {
   async function handleRecordedAudio(blob: Blob) {
     setErrorMsg(null);
     setPhase("uploading");
-    setUploadProgress(0);
     try {
       const filename = `recording-${Date.now()}.webm`;
       const uploaded = await upload(filename, blob, {
         access: "public",
         handleUploadUrl: "/api/blob-upload",
         contentType: "audio/webm",
-        onUploadProgress: ({ percentage }) => setUploadProgress(percentage),
       });
 
       setPhase("transcribing");
@@ -186,10 +184,14 @@ export default function Home() {
     }
   }
 
+  const isBusy =
+    phase === "uploading" ||
+    phase === "transcribing" ||
+    phase === "generating" ||
+    phase === "rendering-pdf";
+
   const canGenerate =
-    (phase === "ready-to-generate" || phase === "done" || phase === "error") &&
-    transcript !== null &&
-    patientName.trim() !== "";
+    !isBusy && transcript !== null && patientName.trim() !== "";
 
   return (
     <main className={styles.main}>
@@ -265,15 +267,7 @@ export default function Home() {
           </div>
 
           {phase === "uploading" && (
-            <div className={styles.progressWrap}>
-              <div
-                className={styles.progressBar}
-                style={{ width: `${uploadProgress}%` }}
-              />
-              <span className={styles.progressText}>
-                Uploading audio… {Math.round(uploadProgress)}%
-              </span>
-            </div>
+            <p className={styles.status}>Uploading audio to storage…</p>
           )}
           {phase === "transcribing" && (
             <p className={styles.status}>Transcribing with Whisper…</p>
@@ -291,7 +285,7 @@ export default function Home() {
             type="button"
             className={styles.primaryBtn}
             onClick={generateReport}
-            disabled={!canGenerate || phase === "generating" || phase === "rendering-pdf"}
+            disabled={!canGenerate}
           >
             {phase === "generating"
               ? "Analyzing with Claude…"

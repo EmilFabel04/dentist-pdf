@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as Body;
     const date = body.date ?? new Date().toISOString().slice(0, 10);
 
-    const buffer = await renderToBuffer(
+    const nodeBuffer = await renderToBuffer(
       ConsultationPDF({
         patientName: body.patientName,
         date,
@@ -26,15 +26,14 @@ export async function POST(request: Request) {
         imageDataUrls: body.imageDataUrls ?? [],
       })
     );
-
     const filename = `consultation-${slug(body.patientName || "patient")}-${date}.pdf`;
 
-    return new NextResponse(buffer, {
+    return new Response(nodeBuffer as unknown as BodyInit, {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="${filename}"`,
-        "Content-Length": String(buffer.length),
+        "Content-Length": String(nodeBuffer.length),
       },
     });
   } catch (error) {

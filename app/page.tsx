@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { upload } from "@vercel/blob/client";
 import type { Report } from "@/app/api/generate/route";
 import styles from "./page.module.css";
 
@@ -111,24 +110,22 @@ export default function Home() {
     }
   }
 
-  async function handleRecordedAudio(blob: Blob) {
+  async function handleRecordedAudio(audioBlob: Blob) {
     setErrorMsg(null);
     setPhase("uploading");
     try {
-      const filename = `recording-${Date.now()}.webm`;
-      const uploaded = await upload(filename, blob, {
-        access: "public",
-        handleUploadUrl: "/api/blob-upload",
-        contentType: "audio/webm",
-      });
+      const formData = new FormData();
+      formData.append("audio", audioBlob, `recording-${Date.now()}.webm`);
 
       setPhase("transcribing");
-      const res = await fetch("/api/transcribe", {
+      const res = await fetch("/api/upload-audio", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ blobUrl: uploaded.url }),
+        body: formData,
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Transcription failed");
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error ?? "Upload/transcription failed");
+      }
       const { transcript: t } = (await res.json()) as { transcript: string };
       setTranscript(t);
       setPhase("ready-to-generate");

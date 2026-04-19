@@ -1,5 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
+import type { Report } from "@/lib/types";
+export type { Report };
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -18,13 +20,6 @@ Be clinical and concise. Do not invent findings not mentioned in the transcript 
 type ImageInput = {
   base64: string;
   mediaType: "image/jpeg" | "image/png" | "image/gif" | "image/webp";
-};
-
-export type Report = {
-  patientSummary: string;
-  findings: { tooth: string; observation: string; severity: "normal" | "monitor" | "urgent" }[];
-  recommendations: string[];
-  followUp: string;
 };
 
 export async function POST(request: Request) {

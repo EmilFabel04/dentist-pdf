@@ -1,5 +1,5 @@
 import { initializeApp, getApps, cert, type ServiceAccount } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, type Firestore } from "firebase-admin/firestore";
 
 const PRACTICE_ID = "default";
 
@@ -15,5 +15,30 @@ function getApp() {
   });
 }
 
-export const db = getFirestore(getApp());
-export const practiceRef = db.collection("practices").doc(PRACTICE_ID);
+let _db: Firestore | undefined;
+
+function getDb() {
+  if (!_db) {
+    _db = getFirestore(getApp());
+  }
+  return _db;
+}
+
+export const db = new Proxy({} as Firestore, {
+  get(_target, prop, receiver) {
+    const real = getDb();
+    const value = Reflect.get(real, prop, receiver);
+    return typeof value === "function" ? value.bind(real) : value;
+  },
+});
+
+export const practiceRef = new Proxy(
+  {} as FirebaseFirestore.DocumentReference,
+  {
+    get(_target, prop, receiver) {
+      const real = getDb().collection("practices").doc(PRACTICE_ID);
+      const value = Reflect.get(real, prop, receiver);
+      return typeof value === "function" ? value.bind(real) : value;
+    },
+  }
+);

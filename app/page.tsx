@@ -197,6 +197,7 @@ export default function Home() {
         <p className={styles.subtitle}>
           Upload X-rays, record notes, and generate a patient PDF.
         </p>
+        <a href="/admin" className={styles.adminLink}>Admin Panel</a>
 
         <section className={styles.section}>
           <label className={styles.label}>Patient name</label>

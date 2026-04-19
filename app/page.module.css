@@ -220,3 +220,14 @@
 .sev-normal { color: #198038; }
 .sev-monitor { color: #d2a106; }
 .sev-urgent { color: #da1e28; font-weight: 600; }
+
+.adminLink {
+  display: inline-block;
+  margin-bottom: 24px;
+  font-size: 0.85rem;
+  color: #0f62fe;
+  text-decoration: none;
+}
+.adminLink:hover {
+  text-decoration: underline;
+}

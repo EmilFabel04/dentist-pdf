@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Report } from "@/app/api/generate/route";
+import type { Report, Treatment, SelectedTreatment } from "@/lib/types";
 import styles from "./page.module.css";
 
 type XRay = {
@@ -17,7 +17,8 @@ type Phase =
   | "transcribing"
   | "ready-to-generate"
   | "generating"
-  | "rendering-pdf"
+  | "review-treatments"
+  | "rendering-docs"
   | "done"
   | "error";
 
@@ -37,13 +38,16 @@ export default function Home() {
 
   const [transcript, setTranscript] = useState<string | null>(null);
   const [report, setReport] = useState<Report | null>(null);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [pdfFilename, setPdfFilename] = useState<string>("consultation.pdf");
+  const [allTreatments, setAllTreatments] = useState<Treatment[]>([]);
+  const [selectedTreatments, setSelectedTreatments] = useState<SelectedTreatment[]>([]);
+  const [docxUrl, setDocxUrl] = useState<string | null>(null);
+  const [xlsxUrl, setXlsxUrl] = useState<string | null>(null);
 
   useEffect(
     () => () => {
       xrays.forEach((x) => URL.revokeObjectURL(x.previewUrl));
-      if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+      if (docxUrl) URL.revokeObjectURL(docxUrl);
+      if (xlsxUrl) URL.revokeObjectURL(xlsxUrl);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
@@ -145,35 +149,96 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           transcript,
-          images: xrays.map((x) => ({
-            base64: x.base64,
-            mediaType: x.mediaType,
-          })),
+          images: xrays.map((x) => ({ base64: x.base64, mediaType: x.mediaType })),
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Analysis failed");
       const { report: r } = (await res.json()) as { report: Report };
       setReport(r);
 
-      setPhase("rendering-pdf");
-      const pdfRes = await fetch("/api/pdf", {
+      const matchRes = await fetch("/api/match-treatments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ suggestedTreatments: r.suggestedTreatments ?? [] }),
+      });
+      if (matchRes.ok) {
+        const { matched, all } = (await matchRes.json()) as { matched: Treatment[]; all: Treatment[] };
+        setAllTreatments(all);
+        setSelectedTreatments(matched.map((t) => ({
+          treatment: t,
+          selectedCodes: t.codes.map((c) => ({ ...c, quantity: 1 })),
+        })));
+      }
+
+      setPhase("review-treatments");
+    } catch (err) {
+      setErrorMsg((err as Error).message);
+      setPhase("error");
+    }
+  }
+
+  function toggleTreatment(treatment: Treatment) {
+    setSelectedTreatments((prev) => {
+      const exists = prev.find((s) => s.treatment.id === treatment.id);
+      if (exists) return prev.filter((s) => s.treatment.id !== treatment.id);
+      return [...prev, { treatment, selectedCodes: treatment.codes.map((c) => ({ ...c, quantity: 1 })) }];
+    });
+  }
+
+  function updateQuantity(treatmentId: string, codeIdx: number, quantity: number) {
+    setSelectedTreatments((prev) =>
+      prev.map((s) =>
+        s.treatment.id === treatmentId
+          ? { ...s, selectedCodes: s.selectedCodes.map((c, i) => i === codeIdx ? { ...c, quantity: Math.max(0, quantity) } : c) }
+          : s
+      )
+    );
+  }
+
+  function totalCost() {
+    return selectedTreatments.reduce((sum, s) => sum + s.selectedCodes.reduce((s2, c) => s2 + c.price * c.quantity, 0), 0);
+  }
+
+  async function downloadDocuments() {
+    if (!report) return;
+    setPhase("rendering-docs");
+    setErrorMsg(null);
+    try {
+      const settingsRes = await fetch("/api/admin/settings");
+      const settings = await settingsRes.json();
+
+      const docxRes = await fetch("/api/docx", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           patientName,
           date: new Date().toISOString().slice(0, 10),
-          report: r,
+          report,
           imageDataUrls: xrays.map((x) => `data:${x.mediaType};base64,${x.base64}`),
+          practice: settings,
         }),
       });
-      if (!pdfRes.ok) throw new Error((await pdfRes.json()).error ?? "PDF render failed");
+      if (!docxRes.ok) throw new Error("DOCX generation failed");
+      const docxBlob = await docxRes.blob();
+      if (docxUrl) URL.revokeObjectURL(docxUrl);
+      setDocxUrl(URL.createObjectURL(docxBlob));
 
-      const disposition = pdfRes.headers.get("Content-Disposition") ?? "";
-      const match = disposition.match(/filename="([^"]+)"/);
-      if (match) setPdfFilename(match[1]);
-      const pdfBlob = await pdfRes.blob();
-      if (pdfUrl) URL.revokeObjectURL(pdfUrl);
-      setPdfUrl(URL.createObjectURL(pdfBlob));
+      const xlsxRes = await fetch("/api/xlsx", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patientName,
+          date: new Date().toISOString().slice(0, 10),
+          quoteRef: `Q-${Date.now().toString(36).toUpperCase()}`,
+          selectedTreatments,
+          settings,
+        }),
+      });
+      if (!xlsxRes.ok) throw new Error("XLSX generation failed");
+      const xlsxBlob = await xlsxRes.blob();
+      if (xlsxUrl) URL.revokeObjectURL(xlsxUrl);
+      setXlsxUrl(URL.createObjectURL(xlsxBlob));
+
       setPhase("done");
     } catch (err) {
       setErrorMsg((err as Error).message);
@@ -185,17 +250,21 @@ export default function Home() {
     phase === "uploading" ||
     phase === "transcribing" ||
     phase === "generating" ||
-    phase === "rendering-pdf";
+    phase === "rendering-docs";
 
   const canGenerate =
     !isBusy && transcript !== null && patientName.trim() !== "";
+
+  const unselectedTreatments = allTreatments.filter(
+    (t) => !selectedTreatments.find((s) => s.treatment.id === t.id)
+  );
 
   return (
     <main className={styles.main}>
       <div className={styles.card}>
         <h1 className={styles.title}>Consultation Report</h1>
         <p className={styles.subtitle}>
-          Upload X-rays, record notes, and generate a patient PDF.
+          Upload X-rays, record notes, and generate a patient report.
         </p>
         <a href="/admin" className={styles.adminLink}>Admin Panel</a>
 
@@ -285,29 +354,14 @@ export default function Home() {
             onClick={generateReport}
             disabled={!canGenerate}
           >
-            {phase === "generating"
-              ? "Analyzing with Claude…"
-              : phase === "rendering-pdf"
-                ? "Rendering PDF…"
-                : "Generate Report"}
+            {phase === "generating" ? "Analyzing with Claude…" : "Generate Report"}
           </button>
-
-          {phase === "done" && pdfUrl && (
-            <a
-              href={pdfUrl}
-              download={pdfFilename}
-              className={styles.downloadBtn}
-            >
-              ⬇ Download PDF
-            </a>
-          )}
-
           {errorMsg && <p className={styles.error}>Error: {errorMsg}</p>}
         </section>
 
-        {report && (
+        {report && phase !== "idle" && (
           <section className={styles.section}>
-            <h2 className={styles.previewTitle}>Report preview</h2>
+            <h2 className={styles.previewTitle}>Report Preview</h2>
             <p className={styles.previewPara}>{report.patientSummary}</p>
             <ul className={styles.previewList}>
               {report.findings.map((f, i) => (
@@ -319,6 +373,123 @@ export default function Home() {
                 </li>
               ))}
             </ul>
+          </section>
+        )}
+
+        {(phase === "review-treatments" || phase === "rendering-docs" || phase === "done") && (
+          <section className={styles.section}>
+            <h2 className={styles.previewTitle}>Treatment Selection</h2>
+            <p className={styles.treatmentHint}>
+              Auto-matched from transcript. Adjust quantities or add more treatments.
+            </p>
+
+            {selectedTreatments.map((sel) => (
+              <div key={sel.treatment.id} className={styles.treatmentCard}>
+                <div className={styles.treatmentHeader}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked
+                      onChange={() => toggleTreatment(sel.treatment)}
+                    />
+                    <strong>{sel.treatment.name}</strong>
+                  </label>
+                  <span className={styles.category}>{sel.treatment.category}</span>
+                </div>
+                <table className={styles.codesTable}>
+                  <thead>
+                    <tr>
+                      <th>Code</th>
+                      <th>Description</th>
+                      <th>Price</th>
+                      <th>Qty</th>
+                      <th>Line Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sel.selectedCodes.map((c, ci) => (
+                      <tr key={ci}>
+                        <td>{c.code}</td>
+                        <td>{c.description}</td>
+                        <td>{c.price.toFixed(2)}</td>
+                        <td>
+                          <input
+                            type="number"
+                            className={styles.qtyInput}
+                            value={c.quantity}
+                            min={0}
+                            onChange={(e) =>
+                              updateQuantity(sel.treatment.id, ci, parseInt(e.target.value) || 0)
+                            }
+                          />
+                        </td>
+                        <td className={styles.lineTotal}>
+                          {(c.price * c.quantity).toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+
+            {unselectedTreatments.length > 0 && (
+              <div className={styles.addTreatmentRow}>
+                <select
+                  className={styles.addTreatmentSelect}
+                  value=""
+                  onChange={(e) => {
+                    const t = allTreatments.find((tr) => tr.id === e.target.value);
+                    if (t) toggleTreatment(t);
+                  }}
+                >
+                  <option value="" disabled>
+                    + Add treatment…
+                  </option>
+                  {unselectedTreatments.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} ({t.category})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className={styles.costTotal}>
+              <strong>Total: {totalCost().toFixed(2)}</strong>
+            </div>
+
+            <button
+              type="button"
+              className={styles.primaryBtn}
+              onClick={downloadDocuments}
+              disabled={phase === "rendering-docs"}
+            >
+              {phase === "rendering-docs" ? "Generating Documents…" : "Generate Documents"}
+            </button>
+
+            {phase === "done" && (
+              <div className={styles.downloadRow} style={{ marginTop: 12 }}>
+                {docxUrl && (
+                  <a
+                    href={docxUrl}
+                    download={`${patientName || "consultation"}-report.docx`}
+                    className={styles.downloadBtn}
+                  >
+                    Download .docx
+                  </a>
+                )}
+                {xlsxUrl && (
+                  <a
+                    href={xlsxUrl}
+                    download={`${patientName || "consultation"}-estimate.xlsx`}
+                    className={styles.downloadBtnGreen}
+                  >
+                    Download .xlsx
+                  </a>
+                )}
+              </div>
+            )}
           </section>
         )}
       </div>

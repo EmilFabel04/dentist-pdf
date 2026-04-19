@@ -231,3 +231,115 @@
 .adminLink:hover {
   text-decoration: underline;
 }
+
+.treatmentHint {
+  font-size: 0.85rem;
+  color: #666;
+  margin-bottom: 16px;
+}
+
+.treatmentCard {
+  background: #f6f7f9;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.treatmentHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.treatmentHeader label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.category {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #e8edff;
+  color: #0f62fe;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.codesTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.codesTable th {
+  text-align: left;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: #777;
+}
+
+.codesTable td {
+  padding: 4px 8px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.qtyInput {
+  width: 50px;
+  padding: 4px 6px;
+  border: 1px solid #d0d5dd;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  text-align: center;
+  font-family: inherit;
+}
+
+.lineTotal {
+  font-weight: 600;
+}
+
+.addTreatmentRow {
+  margin: 12px 0;
+}
+
+.addTreatmentSelect {
+  padding: 8px 10px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background: #fff;
+  font-family: inherit;
+  width: 100%;
+}
+
+.costTotal {
+  text-align: right;
+  font-size: 1.1rem;
+  margin: 16px 0;
+  padding: 8px 12px;
+  background: #f0f3f9;
+  border-radius: 6px;
+}
+
+.downloadRow {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.downloadBtnGreen {
+  display: inline-block;
+  padding: 12px 24px;
+  border-radius: 6px;
+  background: #198038;
+  color: #fff;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.downloadBtnGreen:hover {
+  background: #0e6027;
+}

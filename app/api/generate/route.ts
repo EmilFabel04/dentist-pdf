@@ -13,8 +13,10 @@ const SYSTEM_PROMPT = `You are a dental consultation assistant. Given a transcri
   patientSummary: string,
   findings: [{ tooth: string, observation: string, severity: 'normal' | 'monitor' | 'urgent' }],
   recommendations: string[],
-  followUp: string
+  followUp: string,
+  suggestedTreatments: string[]
 }
+suggestedTreatments should list treatment type names mentioned or implied in the transcript (e.g. "Crown", "Root Canal", "Filling", "Implant", "Extraction", "Cleaning").
 Be clinical and concise. Do not invent findings not mentioned in the transcript or visible in the images.`;
 
 type ImageInput = {

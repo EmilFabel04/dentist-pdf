@@ -61,3 +61,29 @@ export type SelectedTreatment = {
     quantity: number;
   }[];
 };
+
+export type Patient = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  dateOfBirth: string;
+  notes: string;
+  createdAt: string;
+};
+
+export type Consultation = {
+  id: string;
+  date: string;
+  transcript: string;
+  report: Report;
+  selectedTreatments: SelectedTreatment[];
+  docxUrl: string | null;
+  xlsxUrl: string | null;
+  createdAt: string;
+};
+
+export type UserProfile = {
+  practiceId: string;
+  role: "dentist";
+};

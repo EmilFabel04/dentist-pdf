@@ -1,5 +1,7 @@
 import { initializeApp, getApps, cert, type ServiceAccount } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 
 const PRACTICE_ID = "default";
 
@@ -42,3 +44,27 @@ export const practiceRef = new Proxy(
     },
   }
 );
+
+export async function verifyAuth(request: Request): Promise<{ uid: string; practiceId: string }> {
+  const header = request.headers.get("Authorization");
+  if (!header?.startsWith("Bearer ")) {
+    throw new Error("Missing or invalid Authorization header");
+  }
+  const token = header.slice(7);
+  const decoded = await getAuth(getApp()).verifyIdToken(token);
+
+  const userDoc = await getDb().collection("users").doc(decoded.uid).get();
+  if (!userDoc.exists) {
+    throw new Error("User not registered");
+  }
+  const { practiceId } = userDoc.data() as { practiceId: string };
+  return { uid: decoded.uid, practiceId };
+}
+
+export function getPracticeRef(practiceId: string) {
+  return getDb().collection("practices").doc(practiceId);
+}
+
+export function getStorageBucket() {
+  return getStorage(getApp()).bucket();
+}

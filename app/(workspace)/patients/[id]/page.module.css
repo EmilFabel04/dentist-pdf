@@ -1,0 +1,193 @@
+.backLink {
+  font-size: 0.85rem;
+  color: #0f62fe;
+  margin-bottom: 16px;
+  display: inline-block;
+  text-decoration: none;
+}
+
+.backLink:hover {
+  text-decoration: underline;
+}
+
+.heading {
+  font-size: 1.5rem;
+  margin-bottom: 20px;
+}
+
+.infoCard {
+  background: white;
+  border-radius: 10px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  margin-bottom: 24px;
+}
+
+.cardTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0f62fe;
+  margin-bottom: 16px;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fieldLabel {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: #555;
+  font-weight: 600;
+}
+
+.input {
+  padding: 8px 10px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  font-family: inherit;
+}
+
+.input:focus {
+  border-color: #0f62fe;
+  outline: none;
+}
+
+.textarea {
+  padding: 8px 10px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  font-family: inherit;
+  min-height: 60px;
+  resize: vertical;
+}
+
+.textarea:focus {
+  border-color: #0f62fe;
+  outline: none;
+}
+
+.saveBtn {
+  padding: 8px 16px;
+  background: #198038;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  margin-top: 12px;
+}
+
+.sectionTitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.consultTable {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.consultTable th {
+  text-align: left;
+  padding: 12px 16px;
+  background: #f0f3f9;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  color: #555;
+}
+
+.consultTable td {
+  padding: 12px 16px;
+  border-top: 1px solid #eee;
+  font-size: 0.95rem;
+}
+
+.downloadBtn {
+  padding: 6px 12px;
+  background: #0f62fe;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-decoration: none;
+  font-family: inherit;
+  margin-right: 6px;
+}
+
+.downloadBtn:hover {
+  background: #0043ce;
+}
+
+.downloadBtnGreen {
+  padding: 6px 12px;
+  background: #198038;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-decoration: none;
+  font-family: inherit;
+}
+
+.downloadBtnGreen:hover {
+  background: #116329;
+}
+
+.newConsultBtn {
+  padding: 8px 16px;
+  background: #0f62fe;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.newConsultBtn:hover {
+  background: #0043ce;
+}
+
+.emptyConsult {
+  text-align: center;
+  padding: 24px;
+  color: #888;
+  background: #f6f7f9;
+  border-radius: 8px;
+}
+
+.summarySnippet {
+  color: #555;
+  font-size: 0.85rem;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toast {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #defbe6;
+  color: #198038;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}

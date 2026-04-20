@@ -1,0 +1,147 @@
+.heading {
+  font-size: 1.5rem;
+  margin-bottom: 4px;
+}
+
+.toolbar {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 200px;
+  padding: 8px 12px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+
+.searchInput:focus {
+  border-color: #0f62fe;
+  outline: none;
+}
+
+.addBtn {
+  padding: 8px 16px;
+  background: #0f62fe;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.addBtn:hover {
+  background: #0043ce;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.table th {
+  text-align: left;
+  padding: 12px 16px;
+  background: #f0f3f9;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  color: #555;
+}
+
+.table td {
+  padding: 12px 16px;
+  border-top: 1px solid #eee;
+  font-size: 0.95rem;
+}
+
+.clickableRow {
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.clickableRow:hover {
+  background: #f8f9fc;
+}
+
+.empty {
+  text-align: center;
+  padding: 40px;
+  color: #888;
+}
+
+.inlineForm {
+  background: #fafbfd;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  border-top: 2px solid #0f62fe;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fieldLabel {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: #555;
+  font-weight: 600;
+}
+
+.input {
+  padding: 8px 10px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  font-family: inherit;
+}
+
+.input:focus {
+  border-color: #0f62fe;
+  outline: none;
+}
+
+.formActions {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.saveBtn {
+  padding: 8px 16px;
+  background: #198038;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.cancelBtn {
+  padding: 8px 16px;
+  background: white;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+}

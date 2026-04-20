@@ -1,0 +1,611 @@
+/* ── Patient Selector ───────────────────────────────────────── */
+
+.patientSection {
+  background: white;
+  border-radius: 10px;
+  padding: 20px 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  margin-bottom: 24px;
+}
+
+.patientSearch {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  position: relative;
+}
+
+.patientSearchInput {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+
+.patientSearchInput:focus {
+  border-color: #0f62fe;
+  outline: none;
+}
+
+.patientDropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 120px;
+  background: white;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 10;
+  margin-top: 4px;
+}
+
+.patientDropdownItem {
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.patientDropdownItem:last-child {
+  border-bottom: none;
+}
+
+.patientDropdownItem:hover {
+  background: #e8edff;
+}
+
+.patientBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #e8edff;
+  color: #0f62fe;
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.patientBadgeRemove {
+  background: none;
+  border: none;
+  color: #0f62fe;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0 2px;
+}
+
+.patientBadgeRemove:hover {
+  color: #da1e28;
+}
+
+.newPatientBtn {
+  padding: 8px 14px;
+  background: white;
+  color: #0f62fe;
+  border: 1px solid #0f62fe;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.newPatientBtn:hover {
+  background: #e8edff;
+}
+
+.newPatientForm {
+  margin-top: 16px;
+  padding: 16px;
+  background: #f6f7f9;
+  border-radius: 8px;
+}
+
+.newPatientFormGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.newPatientFormActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* ── Common Sections ───────────────────────────────────────── */
+
+.heading {
+  font-size: 1.5rem;
+  margin-bottom: 20px;
+}
+
+.section {
+  background: white;
+  border-radius: 10px;
+  padding: 20px 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  margin-bottom: 24px;
+}
+
+.sectionTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0f62fe;
+  margin-bottom: 12px;
+}
+
+.label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: #555;
+  font-weight: 600;
+  margin-bottom: 4px;
+  display: block;
+}
+
+.input {
+  padding: 8px 10px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.input:focus {
+  border-color: #0f62fe;
+  outline: none;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* ── File Input / X-rays ───────────────────────────────────── */
+
+.fileInput {
+  font-size: 0.95rem;
+}
+
+.thumbGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.thumbWrap {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e0e0e0;
+}
+
+.thumb {
+  display: block;
+  width: 120px;
+  height: 90px;
+  object-fit: cover;
+}
+
+.removeBtn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(218, 30, 40, 0.85);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.removeBtn:hover {
+  background: #da1e28;
+}
+
+/* ── Recording ─────────────────────────────────────────────── */
+
+.recordRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.recordBtn {
+  padding: 10px 20px;
+  background: #0f62fe;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+
+.recordBtn:hover {
+  background: #0043ce;
+}
+
+.recordBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.stopBtn {
+  padding: 10px 20px;
+  background: #da1e28;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+
+.stopBtn:hover {
+  background: #b81922;
+}
+
+.timer {
+  font-size: 1.1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #333;
+  min-width: 50px;
+}
+
+.status {
+  font-size: 0.9rem;
+  color: #555;
+  padding: 6px 0;
+}
+
+.transcriptBox {
+  margin-top: 12px;
+}
+
+.transcriptToggle {
+  font-size: 0.85rem;
+  color: #0f62fe;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  padding: 0;
+  font-family: inherit;
+}
+
+.transcriptToggle:hover {
+  text-decoration: underline;
+}
+
+.transcriptText {
+  margin-top: 8px;
+  padding: 12px;
+  background: #f6f7f9;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: #333;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+/* ── Buttons ───────────────────────────────────────────────── */
+
+.primaryBtn {
+  padding: 10px 24px;
+  background: #0f62fe;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+
+.primaryBtn:hover {
+  background: #0043ce;
+}
+
+.primaryBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.downloadBtn {
+  padding: 8px 16px;
+  background: #0f62fe;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.downloadBtn:hover {
+  background: #0043ce;
+}
+
+.downloadBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.downloadBtnGreen {
+  padding: 8px 16px;
+  background: #198038;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.downloadBtnGreen:hover {
+  background: #116329;
+}
+
+.downloadBtnGreen:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Report Preview ────────────────────────────────────────── */
+
+.previewTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.previewPara {
+  font-size: 0.95rem;
+  color: #333;
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+.previewList {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+}
+
+.previewList li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 0.9rem;
+}
+
+.previewList li:last-child {
+  border-bottom: none;
+}
+
+.sevBadge {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.sevNormal {
+  composes: sevBadge;
+  background: #defbe6;
+  color: #198038;
+}
+
+.sevMonitor {
+  composes: sevBadge;
+  background: #fff3cd;
+  color: #d2a106;
+}
+
+.sevUrgent {
+  composes: sevBadge;
+  background: #fde8e8;
+  color: #da1e28;
+}
+
+/* ── Treatment Review ──────────────────────────────────────── */
+
+.treatmentHint {
+  font-size: 0.85rem;
+  color: #888;
+  margin-bottom: 16px;
+}
+
+.treatmentCard {
+  background: white;
+  border-radius: 10px;
+  padding: 16px 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  margin-bottom: 16px;
+}
+
+.treatmentHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.treatmentHeader input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #0f62fe;
+  cursor: pointer;
+}
+
+.treatmentName {
+  font-weight: 600;
+  font-size: 0.95rem;
+  flex: 1;
+}
+
+.category {
+  padding: 2px 8px;
+  background: #e8edff;
+  color: #0f62fe;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.codesTable {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+
+.codesTable th {
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: #555;
+  background: #f6f7f9;
+}
+
+.codesTable td {
+  padding: 8px 10px;
+  border-top: 1px solid #f0f0f0;
+  font-size: 0.9rem;
+}
+
+.qtyInput {
+  width: 50px;
+  padding: 4px 6px;
+  border: 1px solid #d0d5dd;
+  border-radius: 4px;
+  text-align: center;
+  font-family: inherit;
+}
+
+.qtyInput:focus {
+  border-color: #0f62fe;
+  outline: none;
+}
+
+.lineTotal {
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.addTreatmentRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  margin-bottom: 16px;
+}
+
+.addTreatmentSelect {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.costTotal {
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-align: right;
+  padding: 12px 0;
+  border-top: 2px solid #e0e0e0;
+  margin-top: 8px;
+}
+
+.downloadRow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+/* ── Save / Success ────────────────────────────────────────── */
+
+.saveBtn {
+  padding: 10px 24px;
+  background: #198038;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+
+.saveBtn:hover {
+  background: #116329;
+}
+
+.saveBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.successMsg {
+  background: #defbe6;
+  color: #198038;
+  padding: 16px 20px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  margin-top: 16px;
+}
+
+.successMsg a {
+  color: #0f62fe;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.successMsg a:hover {
+  text-decoration: underline;
+}
+
+/* ── Error ─────────────────────────────────────────────────── */
+
+.error {
+  background: #fde8e8;
+  color: #da1e28;
+  padding: 12px 16px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  margin-bottom: 16px;
+}

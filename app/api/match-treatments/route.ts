@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server";
-import { practiceRef } from "@/lib/firebase";
+import { verifyAuth, getPracticeRef } from "@/lib/firebase";
 import type { Treatment } from "@/lib/types";
 
 export async function POST(request: Request) {
   try {
+    const { practiceId } = await verifyAuth(request);
+    const ref = getPracticeRef(practiceId);
     const { suggestedTreatments } = (await request.json()) as {
       suggestedTreatments: string[];
     };
 
-    const snapshot = await practiceRef.collection("treatments").get();
+    const snapshot = await ref.collection("treatments").get();
     const allTreatments: Treatment[] = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),

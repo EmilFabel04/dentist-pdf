@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
+import { verifyAuth } from "@/lib/firebase";
 import type { Report } from "@/lib/types";
 export type { Report };
 
@@ -26,6 +27,7 @@ type ImageInput = {
 
 export async function POST(request: Request) {
   try {
+    await verifyAuth(request);
     const { transcript, images } = (await request.json()) as {
       transcript: string;
       images: ImageInput[];

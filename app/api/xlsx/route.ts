@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { verifyAuth } from "@/lib/firebase";
 import type { SelectedTreatment, PracticeSettings } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -15,6 +16,7 @@ type Body = {
 
 export async function POST(request: Request) {
   try {
+    await verifyAuth(request);
     const body = (await request.json()) as Body;
     const {
       patientName,

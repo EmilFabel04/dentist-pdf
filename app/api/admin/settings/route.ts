@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { practiceRef } from "@/lib/firebase";
+import { verifyAuth, getPracticeRef } from "@/lib/firebase";
 import type { PracticeSettings } from "@/lib/types";
 
 const DEFAULT_SETTINGS: PracticeSettings = {
@@ -15,9 +15,11 @@ const DEFAULT_SETTINGS: PracticeSettings = {
   defaultPaymentTerms: "",
 };
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const doc = await practiceRef.get();
+    const { practiceId } = await verifyAuth(request);
+    const ref = getPracticeRef(practiceId);
+    const doc = await ref.get();
     const data = doc.exists ? (doc.data() as PracticeSettings) : DEFAULT_SETTINGS;
     return NextResponse.json(data);
   } catch (error) {
@@ -28,8 +30,10 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   try {
+    const { practiceId } = await verifyAuth(request);
+    const ref = getPracticeRef(practiceId);
     const body = (await request.json()) as Partial<PracticeSettings>;
-    await practiceRef.set(body, { merge: true });
+    await ref.set(body, { merge: true });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[admin/settings] PUT error:", error);

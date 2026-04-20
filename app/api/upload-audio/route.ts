@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { verifyAuth } from "@/lib/firebase";
 import OpenAI from "openai";
 
 export const runtime = "nodejs";
@@ -8,6 +9,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function POST(request: Request) {
   try {
+    await verifyAuth(request);
     const formData = await request.formData();
     const audioFile = formData.get("audio") as File | null;
 

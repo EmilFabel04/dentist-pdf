@@ -14,6 +14,7 @@ import {
   BorderStyle,
   ImageRun,
 } from "docx";
+import { verifyAuth } from "@/lib/firebase";
 import type { Report } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -84,6 +85,7 @@ function severityColor(severity: string): string {
 
 export async function POST(request: Request) {
   try {
+    await verifyAuth(request);
     const body = (await request.json()) as Body;
     const { patientName, date, report, imageDataUrls, practice } = body;
 

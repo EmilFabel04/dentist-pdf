@@ -1,0 +1,55 @@
+.heading {
+  font-size: 1.5rem;
+  margin-bottom: 24px;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.statCard {
+  background: #fff;
+  border-radius: 10px;
+  padding: 24px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  text-align: center;
+}
+
+.statValue {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #0f62fe;
+  display: block;
+}
+
+.statLabel {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #666;
+}
+
+.actionsRow {
+  display: flex;
+  gap: 16px;
+}
+
+.actionBtn {
+  padding: 16px 32px;
+  background: #fff;
+  border: 2px solid #0f62fe;
+  border-radius: 10px;
+  color: #0f62fe;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.actionBtn:hover {
+  background: #0f62fe;
+  color: #fff;
+}

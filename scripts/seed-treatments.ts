@@ -59,7 +59,7 @@ type TreatmentGroup = {
 
 type TCEntry = {
   name: string;
-  category: string;
+  categories: string[];
   description: string;
   conditions: string;
   warranty: string;
@@ -69,32 +69,41 @@ type TCEntry = {
 
 const CATEGORY_RANGES: [number, number, string, string][] = [
   [8099, 8099, "lab-fee", "Lab Fees"],
-  [8101, 8130, "diagnostic", "Diagnostic & Examination"],
-  [8131, 8160, "preventive", "Preventive & Basic"],
+  [8101, 8126, "diagnostic", "Diagnostic & Examination"],
+  [8129, 8137, "emergency", "Emergency Treatment"],
+  [8139, 8139, "admin", "Admin"],
+  [8140, 8140, "emergency", "Emergency"],
+  [8142, 8142, "restorative", "Restorative"],
+  [8145, 8146, "basic", "Basic Per-Visit"],
+  [8148, 8148, "diagnostic", "Diagnostic"],
+  [8151, 8159, "preventive", "Preventive & Hygiene"],
   [8161, 8199, "restorative", "Restorative"],
-  [8200, 8260, "surgical", "Oral Surgery & Extractions"],
-  [8261, 8299, "surgical", "Implant Surgery"],
-  [8301, 8360, "endodontic", "Endodontics"],
+  [8200, 8230, "surgical", "Oral Surgery & Extractions"],
+  [8231, 8260, "implant", "Implant Surgery"],
+  [8261, 8299, "implant", "Implant Components"],
+  [8301, 8310, "endodontic", "Endodontics - Pulp"],
+  [8311, 8360, "endodontic", "Endodontics - Root Canal"],
   [8361, 8399, "restorative", "Restorative - Fillings"],
-  [8400, 8499, "prosthodontic", "Crowns"],
-  [8500, 8599, "prosthodontic", "Bridges & Fixed Prosthetics"],
+  [8400, 8499, "crown", "Crowns"],
+  [8500, 8599, "bridge", "Bridges & Fixed Prosthetics"],
   [8600, 8699, "prosthodontic", "Dentures & Removable"],
   [8700, 8799, "periodontal", "Periodontics"],
   [8800, 8899, "orthodontic", "Orthodontics"],
   [8900, 8999, "surgical", "Post-operative"],
 ];
 
-// T&C rows use these "codes" as identifiers
-const TC_ENTRIES: Record<string, string> = {
-  Treatment: "general",
-  Consultation: "diagnostic",
-  "Check Up": "diagnostic",
-  "Scale and Polish": "preventive",
-  Restorations: "restorative",
-  "Root Canal": "endodontic",
-  "Crown and Bridge/ post and core": "prosthodontic",
-  Implants: "surgical",
-  "Provisional crowns/prostheses": "prosthodontic",
+// T&C rows: map each to the specific categories it applies to
+// A T&C can apply to multiple categories
+const TC_ENTRIES: Record<string, string[]> = {
+  "Consultation": ["diagnostic"],
+  "Check Up": ["diagnostic"],
+  "Scale and Polish": ["preventive"],
+  "Restorations": ["restorative"],
+  "Root Canal": ["endodontic"],
+  "Crown and Bridge/ post and core": ["crown", "bridge", "prosthodontic"],
+  "Implants": ["implant"],
+  "Provisional crowns/prostheses": ["crown", "prosthodontic"],
+  // "Treatment" is the general header row — not applied to treatments
 };
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -224,17 +233,19 @@ async function main() {
     const icd10Str = icd10Raw ? String(icd10Raw).trim() : "";
     const costRaw = cellValue(row.getCell(5));
 
-    // Detect T&C rows
+    // Detect T&C rows (non-procedure rows with treatment category names)
     if (codeStr in TC_ENTRIES) {
       tcEntries.push({
         name: codeStr,
-        category: TC_ENTRIES[codeStr],
+        categories: TC_ENTRIES[codeStr],
         description: descStr,
         conditions: icd10Str,
         warranty: costRaw ? String(costRaw).trim() : "",
       });
       return;
     }
+    // Skip the generic "Treatment" header row
+    if (codeStr === "Treatment") return;
 
     // For remapped aesthetics (NEURO→9099C), use the billing code
     // but mark with a group key so they don't merge with Chlorhexidine
@@ -313,9 +324,9 @@ async function main() {
       ? "Neurotoxin Injections"
       : groupName(codes, groups);
 
-    // Build T&Cs for this treatment's category
+    // Build T&Cs — only apply T&Cs that specifically list this category
     const relevantTCs = tcEntries.filter(
-      (tc) => tc.category === category || tc.category === "general"
+      (tc) => tc.categories.includes(category)
     );
     const tcText = relevantTCs
       .map((tc) => {

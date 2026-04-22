@@ -226,7 +226,7 @@ export default function TreatmentsPage() {
     setEditData({
       name: "",
       category: "other",
-      codes: [{ code: "", description: "", price: 0 }],
+      codes: [{ code: "", description: "", price: 0, icd10: "", labFee: 0, implantFee: 0 }],
       termsAndConditions: "",
     });
   }
@@ -569,6 +569,7 @@ export default function TreatmentsPage() {
               <th>Category</th>
               <th>Codes</th>
               <th>Price Range</th>
+              <th>ICD-10</th>
             </tr>
           </thead>
           <tbody>
@@ -585,10 +586,13 @@ export default function TreatmentsPage() {
                   </td>
                   <td>{t.codes.length}</td>
                   <td className={styles.priceRange}>{priceRange(t.codes)}</td>
+                  <td style={{ fontSize: "0.8rem", color: "#666" }}>
+                    {t.codes[0]?.icd10 || "—"}
+                  </td>
                 </tr>
                 {expandedId === t.id && editData && (
                   <tr key={`${t.id}-edit`} className={styles.expandedRow}>
-                    <td colSpan={4}>
+                    <td colSpan={5}>
                       <div className={styles.editor}>
                         <div className={styles.editorGrid}>
                           <div className={styles.field}>
@@ -622,7 +626,10 @@ export default function TreatmentsPage() {
                               <tr>
                                 <th>Code</th>
                                 <th>Description</th>
-                                <th>Price</th>
+                                <th>ICD-10</th>
+                                <th>Unit Cost</th>
+                                <th>Lab Fee</th>
+                                <th>Implant Fee</th>
                                 <th></th>
                               </tr>
                             </thead>
@@ -634,6 +641,7 @@ export default function TreatmentsPage() {
                                       className={styles.input}
                                       value={c.code}
                                       onChange={(e) => updateCode(i, "code", e.target.value)}
+                                      style={{ width: 70 }}
                                     />
                                   </td>
                                   <td>
@@ -648,11 +656,42 @@ export default function TreatmentsPage() {
                                   <td>
                                     <input
                                       className={styles.input}
+                                      value={c.icd10 || ""}
+                                      onChange={(e) => updateCode(i, "icd10", e.target.value)}
+                                      style={{ width: 70 }}
+                                    />
+                                  </td>
+                                  <td>
+                                    <input
+                                      className={styles.input}
                                       type="number"
                                       value={c.price}
                                       onChange={(e) =>
                                         updateCode(i, "price", parseFloat(e.target.value) || 0)
                                       }
+                                      style={{ width: 80 }}
+                                    />
+                                  </td>
+                                  <td>
+                                    <input
+                                      className={styles.input}
+                                      type="number"
+                                      value={c.labFee || 0}
+                                      onChange={(e) =>
+                                        updateCode(i, "labFee", parseFloat(e.target.value) || 0)
+                                      }
+                                      style={{ width: 80 }}
+                                    />
+                                  </td>
+                                  <td>
+                                    <input
+                                      className={styles.input}
+                                      type="number"
+                                      value={c.implantFee || 0}
+                                      onChange={(e) =>
+                                        updateCode(i, "implantFee", parseFloat(e.target.value) || 0)
+                                      }
+                                      style={{ width: 80 }}
                                     />
                                   </td>
                                   <td>

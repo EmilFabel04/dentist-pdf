@@ -5,6 +5,13 @@ import type { SelectedTreatment, PracticeSettings } from "@/lib/types";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+type BasicCodeItem = {
+  code: string;
+  description: string;
+  price: number;
+  quantity: number;
+};
+
 type Body = {
   patientName: string;
   date: string;
@@ -12,6 +19,8 @@ type Body = {
   selectedTreatments: SelectedTreatment[];
   settings: PracticeSettings;
   discount?: number;
+  appointmentCount?: number;
+  basicCodes?: BasicCodeItem[];
 };
 
 export async function POST(request: Request) {
@@ -25,119 +34,226 @@ export async function POST(request: Request) {
       selectedTreatments,
       settings,
       discount,
+      appointmentCount,
+      basicCodes,
     } = body;
 
     const currency = settings.currency || "USD";
     const currencyFmt = `"${currency}" #,##0.00`;
+    const blueColor = "FF0F62FE";
+    const lightBlueBg = "FFE8EDFF";
+    const headerGrayBg = "FFF0F3F9";
 
     const workbook = new ExcelJS.Workbook();
 
     /* ═══════════════════════════════════════════════════════════
-       Sheet 1: Estimate
+       Sheet 1: Full Estimate (professional letter format)
        ═══════════════════════════════════════════════════════════ */
-    const ws = workbook.addWorksheet("Estimate");
+    const ws = workbook.addWorksheet("Full Estimate");
 
     ws.columns = [
-      { key: "code", width: 14 },
-      { key: "description", width: 40 },
+      { key: "code", width: 12 },
+      { key: "description", width: 45 },
       { key: "qty", width: 8 },
       { key: "price", width: 14 },
-      { key: "total", width: 14 },
+      { key: "amount", width: 14 },
     ];
 
-    /* Row 1 – Practice name */
-    ws.mergeCells("A1:E1");
-    const titleCell = ws.getCell("A1");
-    titleCell.value = settings.name;
-    titleCell.font = { bold: true, size: 16, color: { argb: "FF3B82F6" } };
+    /* ── Header Section (rows 1-7) ──────────────────────────── */
 
-    /* Row 2 – Address */
+    // Row 1: empty
+    // Row 2: Practice name
     ws.mergeCells("A2:E2");
-    ws.getCell("A2").value = settings.address;
+    const practiceNameCell = ws.getCell("A2");
+    practiceNameCell.value = settings.name;
+    practiceNameCell.font = { bold: true, size: 14, color: { argb: blueColor } };
 
-    /* Row 3 – Phone | Email */
+    // Row 3: Phone number
     ws.mergeCells("A3:E3");
-    ws.getCell("A3").value = `${settings.phone}  |  ${settings.email}`;
+    ws.getCell("A3").value = settings.phone;
 
-    /* Row 5 – Patient + Date */
-    ws.getCell("A5").value = "Patient:";
-    ws.getCell("A5").font = { bold: true };
-    ws.getCell("B5").value = patientName;
-    ws.getCell("D5").value = "Date:";
-    ws.getCell("D5").font = { bold: true };
-    ws.getCell("E5").value = date;
+    // Row 4: Practice Number (stored in vatNumber field)
+    ws.mergeCells("A4:E4");
+    ws.getCell("A4").value = `Practice Number: ${settings.vatNumber}`;
 
-    /* Row 6 – Quote Ref */
-    ws.getCell("A6").value = "Quote Ref:";
-    ws.getCell("A6").font = { bold: true };
-    ws.getCell("B6").value = quoteRef;
+    // Row 5: Email
+    ws.mergeCells("A5:E5");
+    ws.getCell("A5").value = settings.email;
 
-    /* Row 8 – Column headers */
-    const headerRow = 8;
-    const headers = ["Code", "Description", "Qty", "Unit Price", "Total"];
+    // Rows 6-7: Empty
+
+    /* ── Patient Section (rows 8-11) ────────────────────────── */
+
+    // Row 8: "Dear [patient name]" + "Date:" right-aligned in col E
+    ws.getCell("A8").value = `Dear ${patientName}`;
+    ws.getCell("A8").font = { size: 11 };
+    ws.getCell("E8").value = `Date: ${date}`;
+    ws.getCell("E8").alignment = { horizontal: "right" };
+    ws.getCell("E8").font = { size: 11 };
+
+    // Row 9: Empty
+
+    // Rows 10-11: Professional greeting paragraph (merged A10:E11)
+    ws.mergeCells("A10:E11");
+    const greetingCell = ws.getCell("A10");
+    greetingCell.value =
+      "I hope this letter finds you well. Following your recent appointment and review of the available information, my advice for treatment is as per the following estimate. This estimate details the necessary appointments and sequence of treatment.";
+    greetingCell.alignment = { wrapText: true, vertical: "top" };
+    greetingCell.font = { size: 11 };
+    ws.getRow(10).height = 22;
+    ws.getRow(11).height = 22;
+
+    // Row 12: Empty
+
+    /* ── Validity Note (rows 13-14) ─────────────────────────── */
+    ws.mergeCells("A13:E14");
+    const validityCell = ws.getCell("A13");
+    validityCell.value = `NB: This estimate is valid for ${settings.quoteValidityDays} days. Fees increase at the beginning of each calendar year, therefore, fees will be adjusted accordingly should your treatment plan extend into a new year. 3rd party provider fees are subject to change depending on the provider.`;
+    validityCell.alignment = { wrapText: true, vertical: "top" };
+    validityCell.font = { italic: true, size: 11 };
+    ws.getRow(13).height = 22;
+    ws.getRow(14).height = 22;
+
+    // Row 15: Empty
+
+    /* ── Treatment Plan Section ──────────────────────────────── */
+
+    // Row 16: "Proposed Treatment Plan:"
+    ws.mergeCells("A16:E16");
+    const planTitleCell = ws.getCell("A16");
+    planTitleCell.value = "Proposed Treatment Plan:";
+    planTitleCell.font = { bold: true, size: 12, color: { argb: blueColor } };
+
+    // Row 17: Empty
+
+    // Row 18: Column headers
+    const headerRowNum = 18;
+    const headers = ["Code", "Description", "Qty", "Unit Price", "Amount"];
     headers.forEach((h, i) => {
-      const cell = ws.getCell(headerRow, i + 1);
+      const cell = ws.getCell(headerRowNum, i + 1);
       cell.value = h;
-      cell.font = { bold: true };
+      cell.font = { bold: true, size: 11 };
       cell.fill = {
         type: "pattern",
         pattern: "solid",
-        fgColor: { argb: "FFF0F3F9" },
+        fgColor: { argb: headerGrayBg },
       };
       cell.border = {
         bottom: { style: "thin" },
       };
+      if (i >= 2) {
+        cell.alignment = { horizontal: "center" };
+      }
     });
 
-    let row = headerRow + 1;
+    let row = headerRowNum + 1;
     let grandTotal = 0;
 
-    for (const st of selectedTreatments) {
-      /* Group header */
+    // Determine number of appointments
+    const numAppointments = appointmentCount || selectedTreatments.length || 1;
+
+    // Distribute treatments across appointments
+    // If appointmentCount is provided, group treatments accordingly;
+    // otherwise each treatment is its own appointment
+    const treatmentsPerAppointment: SelectedTreatment[][] = [];
+    if (appointmentCount && appointmentCount > 0) {
+      // Spread treatments across the specified number of appointments
+      for (let i = 0; i < appointmentCount; i++) {
+        treatmentsPerAppointment.push([]);
+      }
+      selectedTreatments.forEach((st, idx) => {
+        const apptIdx = idx % appointmentCount;
+        treatmentsPerAppointment[apptIdx].push(st);
+      });
+    } else {
+      // Each treatment becomes its own appointment
+      selectedTreatments.forEach((st) => {
+        treatmentsPerAppointment.push([st]);
+      });
+    }
+
+    for (let apptIdx = 0; apptIdx < treatmentsPerAppointment.length; apptIdx++) {
+      const apptTreatments = treatmentsPerAppointment[apptIdx];
+
+      /* Appointment header row */
       ws.mergeCells(row, 1, row, 5);
-      const groupCell = ws.getCell(row, 1);
-      groupCell.value = st.treatment.name;
-      groupCell.font = { bold: true, color: { argb: "FF3B82F6" } };
-      groupCell.fill = {
+      const apptHeaderCell = ws.getCell(row, 1);
+      apptHeaderCell.value = `Appointment ${apptIdx + 1}`;
+      apptHeaderCell.font = { bold: true, size: 11, color: { argb: blueColor } };
+      apptHeaderCell.fill = {
         type: "pattern",
         pattern: "solid",
-        fgColor: { argb: "FFE8EDFF" },
+        fgColor: { argb: lightBlueBg },
       };
       row++;
 
-      let subtotal = 0;
+      let appointmentSubtotal = 0;
 
-      for (const sc of st.selectedCodes) {
-        const lineTotal = sc.price * sc.quantity;
-        subtotal += lineTotal;
+      /* Basic codes for this appointment */
+      if (basicCodes && basicCodes.length > 0) {
+        for (const bc of basicCodes) {
+          const lineTotal = bc.price * bc.quantity;
+          appointmentSubtotal += lineTotal;
 
-        ws.getCell(row, 1).value = sc.code;
-        ws.getCell(row, 2).value = sc.description;
-        const qtyCell = ws.getCell(row, 3);
-        qtyCell.value = sc.quantity;
-        qtyCell.alignment = { horizontal: "center" };
-        const priceCell = ws.getCell(row, 4);
-        priceCell.value = sc.price;
-        priceCell.numFmt = currencyFmt;
-        const totalCell = ws.getCell(row, 5);
-        totalCell.value = lineTotal;
-        totalCell.numFmt = currencyFmt;
-        row++;
+          ws.getCell(row, 1).value = bc.code;
+          ws.getCell(row, 2).value = bc.description;
+          const qtyCell = ws.getCell(row, 3);
+          qtyCell.value = bc.quantity;
+          qtyCell.alignment = { horizontal: "center" };
+          const priceCell = ws.getCell(row, 4);
+          priceCell.value = bc.price;
+          priceCell.numFmt = currencyFmt;
+          priceCell.alignment = { horizontal: "right" };
+          const totalCell = ws.getCell(row, 5);
+          totalCell.value = lineTotal;
+          totalCell.numFmt = currencyFmt;
+          totalCell.alignment = { horizontal: "right" };
+          row++;
+        }
       }
 
-      /* Subtotal row */
+      /* Treatment-specific codes */
+      for (const st of apptTreatments) {
+        for (const sc of st.selectedCodes) {
+          const lineTotal = sc.price * sc.quantity;
+          appointmentSubtotal += lineTotal;
+
+          ws.getCell(row, 1).value = sc.code;
+          ws.getCell(row, 2).value = sc.description;
+          const qtyCell = ws.getCell(row, 3);
+          qtyCell.value = sc.quantity;
+          qtyCell.alignment = { horizontal: "center" };
+          const priceCell = ws.getCell(row, 4);
+          priceCell.value = sc.price;
+          priceCell.numFmt = currencyFmt;
+          priceCell.alignment = { horizontal: "right" };
+          const totalCell = ws.getCell(row, 5);
+          totalCell.value = lineTotal;
+          totalCell.numFmt = currencyFmt;
+          totalCell.alignment = { horizontal: "right" };
+          row++;
+        }
+      }
+
+      /* Subtotal row for this appointment */
       ws.getCell(row, 4).value = "Subtotal";
-      ws.getCell(row, 4).font = { italic: true };
+      ws.getCell(row, 4).font = { italic: true, size: 11 };
       ws.getCell(row, 4).alignment = { horizontal: "right" };
       const subCell = ws.getCell(row, 5);
-      subCell.value = subtotal;
+      subCell.value = appointmentSubtotal;
       subCell.numFmt = currencyFmt;
       subCell.font = { bold: true };
+      subCell.alignment = { horizontal: "right" };
       subCell.border = { top: { style: "thin" } };
       row++;
 
-      grandTotal += subtotal;
+      grandTotal += appointmentSubtotal;
+
+      // Empty row between appointments
+      row++;
     }
+
+    /* ── Totals Section ─────────────────────────────────────── */
 
     /* Discount row */
     if (discount && discount > 0) {
@@ -148,49 +264,70 @@ export async function POST(request: Request) {
       discCell.value = -discount;
       discCell.numFmt = currencyFmt;
       discCell.font = { color: { argb: "FF198038" } };
+      discCell.alignment = { horizontal: "right" };
       row++;
       grandTotal -= discount;
     }
 
-    /* Grand total row */
-    ws.getCell(row, 4).value = "Total";
-    ws.getCell(row, 4).font = { bold: true, size: 12 };
+    /* Subtotal (excl VAT) */
+    ws.getCell(row, 4).value = "Subtotal (excl. VAT)";
+    ws.getCell(row, 4).font = { bold: true, size: 11 };
     ws.getCell(row, 4).alignment = { horizontal: "right" };
-    const gtCell = ws.getCell(row, 5);
-    gtCell.value = grandTotal;
-    gtCell.numFmt = currencyFmt;
-    gtCell.font = { bold: true, size: 12 };
-    gtCell.border = { top: { style: "double" } };
+    const subtotalExclCell = ws.getCell(row, 5);
+    subtotalExclCell.value = grandTotal;
+    subtotalExclCell.numFmt = currencyFmt;
+    subtotalExclCell.font = { bold: true, size: 11 };
+    subtotalExclCell.alignment = { horizontal: "right" };
     row++;
 
     /* VAT */
     if (settings.vatRate && settings.vatRate > 0) {
       const vatAmount = grandTotal * (settings.vatRate / 100);
+
       ws.getCell(row, 4).value = `VAT (${settings.vatRate}%)`;
       ws.getCell(row, 4).alignment = { horizontal: "right" };
       const vatCell = ws.getCell(row, 5);
       vatCell.value = vatAmount;
       vatCell.numFmt = currencyFmt;
+      vatCell.alignment = { horizontal: "right" };
       row++;
 
       const finalTotal = grandTotal + vatAmount;
-      ws.getCell(row, 4).value = "Final Total";
+
+      /* TOTAL row */
+      ws.getCell(row, 4).value = "TOTAL";
       ws.getCell(row, 4).font = { bold: true, size: 14 };
       ws.getCell(row, 4).alignment = { horizontal: "right" };
-      const finalCell = ws.getCell(row, 5);
-      finalCell.value = finalTotal;
-      finalCell.numFmt = currencyFmt;
-      finalCell.font = { bold: true, size: 14 };
+      const totalCell = ws.getCell(row, 5);
+      totalCell.value = finalTotal;
+      totalCell.numFmt = currencyFmt;
+      totalCell.font = { bold: true, size: 14 };
+      totalCell.alignment = { horizontal: "right" };
+      totalCell.border = { top: { style: "double" } };
+      row++;
+    } else {
+      /* TOTAL row (no VAT) */
+      ws.getCell(row, 4).value = "TOTAL";
+      ws.getCell(row, 4).font = { bold: true, size: 14 };
+      ws.getCell(row, 4).alignment = { horizontal: "right" };
+      const totalCell = ws.getCell(row, 5);
+      totalCell.value = grandTotal;
+      totalCell.numFmt = currencyFmt;
+      totalCell.font = { bold: true, size: 14 };
+      totalCell.alignment = { horizontal: "right" };
+      totalCell.border = { top: { style: "double" } };
       row++;
     }
 
-    /* Quote validity + payment terms */
+    /* Empty row */
     row++;
-    ws.getCell(row, 1).value = `Quote valid for ${settings.quoteValidityDays} days from date of issue.`;
-    ws.getCell(row, 1).font = { italic: true, color: { argb: "FF999999" } };
-    row++;
-    ws.getCell(row, 1).value = settings.defaultPaymentTerms;
-    ws.getCell(row, 1).font = { italic: true, color: { argb: "FF999999" } };
+
+    /* Payment terms */
+    ws.mergeCells(row, 1, row, 5);
+    const paymentCell = ws.getCell(row, 1);
+    paymentCell.value = settings.defaultPaymentTerms;
+    paymentCell.font = { italic: true, color: { argb: "FF999999" }, size: 10 };
+    paymentCell.alignment = { wrapText: true };
 
     /* ═══════════════════════════════════════════════════════════
        Sheet 2: Terms & Conditions
@@ -203,7 +340,7 @@ export async function POST(request: Request) {
     tcSheet.getCell(tcRow, 1).font = {
       bold: true,
       size: 16,
-      color: { argb: "FF3B82F6" },
+      color: { argb: blueColor },
     };
     tcRow += 2;
 

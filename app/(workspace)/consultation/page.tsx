@@ -77,6 +77,7 @@ function ConsultationInner() {
   // Documents
   const [docxBlob, setDocxBlob] = useState<Blob | null>(null);
   const [xlsxBlob, setXlsxBlob] = useState<Blob | null>(null);
+  const [pptxBlob, setPptxBlob] = useState<Blob | null>(null);
   const [practiceSettings, setPracticeSettings] =
     useState<PracticeSettings | null>(null);
 
@@ -501,6 +502,29 @@ function ConsultationInner() {
       });
       if (xlsxRes.ok) {
         setXlsxBlob(await xlsxRes.blob());
+      }
+
+      // Generate PPTX
+      const pptxRes = await fetch("/api/pptx", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          patientName: selectedPatient.name,
+          date: today,
+          mainComplaint: "",
+          report,
+          selectedTreatments,
+          xrayImages: xrays.map(
+            (x) => `data:${x.mediaType};base64,${x.base64}`
+          ),
+          practice: settings,
+        }),
+      });
+      if (pptxRes.ok) {
+        setPptxBlob(await pptxRes.blob());
       }
 
       setPhase("done");
@@ -1218,6 +1242,19 @@ function ConsultationInner() {
                 }
               >
                 Download .xlsx
+              </button>
+            )}
+            {pptxBlob && (
+              <button
+                className={styles.downloadBtn}
+                onClick={() =>
+                  downloadBlob(
+                    pptxBlob,
+                    `treatment-plan-${selectedPatient?.name.replace(/\s+/g, "-").toLowerCase()}-${new Date().toISOString().split("T")[0]}.pptx`
+                  )
+                }
+              >
+                Download .pptx
               </button>
             )}
           </div>

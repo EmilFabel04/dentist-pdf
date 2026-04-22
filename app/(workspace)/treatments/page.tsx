@@ -567,8 +567,8 @@ export default function TreatmentsPage() {
             <tr>
               <th>Name</th>
               <th>Category</th>
-              <th>Codes</th>
-              <th>Price Range</th>
+              <th>Code(s)</th>
+              <th>Unit Cost</th>
               <th>ICD-10</th>
             </tr>
           </thead>
@@ -584,7 +584,9 @@ export default function TreatmentsPage() {
                   <td>
                     <span className={styles.category}>{t.category}</span>
                   </td>
-                  <td>{t.codes.length}</td>
+                  <td style={{ fontSize: "0.85rem", fontFamily: "monospace" }}>
+                    {t.codes.map((c) => c.code).join(", ")}
+                  </td>
                   <td className={styles.priceRange}>{priceRange(t.codes)}</td>
                   <td style={{ fontSize: "0.8rem", color: "#666" }}>
                     {t.codes[0]?.icd10 || "—"}

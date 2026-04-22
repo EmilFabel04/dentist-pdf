@@ -165,7 +165,7 @@ function baseCode(code: string): string {
   return String(num);
 }
 
-function groupName(codes: RawCode[]): string {
+function groupName(codes: RawCode[], allGroups: Map<string, RawCode[]>): string {
   // Use the shortest description as the group name (usually the base variant)
   const sorted = [...codes].sort(
     (a, b) => a.description.length - b.description.length
@@ -175,6 +175,19 @@ function groupName(codes: RawCode[]): string {
   name = name.replace(/\s+on tooth num\.?\s*$/, "");
   name = name.replace(/\s+per visit\s*$/i, "");
   name = name.trim();
+
+  // If another group would have the same name, append the base code to disambiguate
+  let dupeCount = 0;
+  for (const [, otherCodes] of allGroups) {
+    if (otherCodes === codes) continue;
+    let otherName = [...otherCodes].sort((a, b) => a.description.length - b.description.length)[0].description;
+    otherName = otherName.replace(/\s+on tooth num\.?\s*$/, "").replace(/\s+per visit\s*$/i, "").trim();
+    if (otherName === name) dupeCount++;
+  }
+  if (dupeCount > 0) {
+    name = `${name} (${codes[0].code})`;
+  }
+
   return name;
 }
 
@@ -298,7 +311,7 @@ async function main() {
       : categorize(codes[0].code);
     const name = groupKey === "neuro-9099C"
       ? "Neurotoxin Injections"
-      : groupName(codes);
+      : groupName(codes, groups);
 
     // Build T&Cs for this treatment's category
     const relevantTCs = tcEntries.filter(

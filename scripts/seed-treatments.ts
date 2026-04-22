@@ -138,11 +138,30 @@ function categorize(code: string): string {
   return "other";
 }
 
+// Aesthetic treatments that bill under a standard code
+// The internal name (e.g. NEUROFROWN) becomes the description variant,
+// and the billing code (9099C) is the actual code used on invoices.
+const AESTHETIC_BILLING_MAP: Record<string, string> = {
+  NEUROFROWN: "9099C",
+  NEUROBUNNY: "9099C",
+  NEUROEYES: "9099C",
+  NEUROFORE: "9099C",
+  NEUROTMJ: "9099C",
+  NEUROTMJTEMP: "9099C",
+};
+
+function mapToBillingCode(code: string): string {
+  return AESTHETIC_BILLING_MAP[code.toUpperCase()] ?? code;
+}
+
+function isAestheticRemapped(code: string): boolean {
+  return code.toUpperCase() in AESTHETIC_BILLING_MAP;
+}
+
 function baseCode(code: string): string {
-  // Strip trailing letters to get base: "8109H" → "8109", "8099SEM" → "8099"
-  // But keep aesthetic codes as-is
   const num = parseInt(code);
-  if (isNaN(num)) return code; // aesthetic / non-numeric
+  if (isNaN(num)) return code; // aesthetic / non-numeric — keep as-is
+  // Strip trailing letters: "8109H" → "8109", "8099SEM" → "8099"
   return String(num);
 }
 
@@ -204,14 +223,19 @@ async function main() {
       return;
     }
 
+    // For remapped aesthetics (NEURO→9099C), use the billing code
+    // but mark with a group key so they don't merge with Chlorhexidine
+    const billingCode = mapToBillingCode(codeStr);
+    const remapped = isAestheticRemapped(codeStr);
+
     rawCodes.push({
-      code: codeStr,
+      code: billingCode,
       description: descStr,
       icd10: isICD10(icd10Str) ? icd10Str : "",
       unitCost: numValue(row.getCell(5)),
       labFee: numValue(row.getCell(6)),
       implantFee: numValue(row.getCell(7)),
-      source: "Lookup Items",
+      source: remapped ? "Aesthetic-Neuro" : "Lookup Items",
     });
   });
 
@@ -254,19 +278,27 @@ async function main() {
   console.log(`Parsed ${rawCodes.length} codes, ${tcEntries.length} T&C entries\n`);
 
   // ── 3. Group codes by base number ──────────────────────────
+  // Use source as a prefix to prevent cross-source merging
+  // (e.g. 9099C Chlorhexidine vs 9099C Neurotoxin)
   const groups = new Map<string, RawCode[]>();
   for (const code of rawCodes) {
     const base = baseCode(code.code);
-    if (!groups.has(base)) groups.set(base, []);
-    groups.get(base)!.push(code);
+    const groupKey = code.source === "Aesthetic-Neuro" ? "neuro-9099C" : base;
+    if (!groups.has(groupKey)) groups.set(groupKey, []);
+    groups.get(groupKey)!.push(code);
   }
 
   // ── 4. Build Treatment documents ───────────────────────────
   const treatments: TreatmentGroup[] = [];
 
-  for (const [, codes] of groups) {
-    const category = categorize(codes[0].code);
-    const name = groupName(codes);
+  for (const [groupKey, codes] of groups) {
+    // Determine category — override for known aesthetic groups
+    const category = groupKey === "neuro-9099C"
+      ? "aesthetic"
+      : categorize(codes[0].code);
+    const name = groupKey === "neuro-9099C"
+      ? "Neurotoxin Injections"
+      : groupName(codes);
 
     // Build T&Cs for this treatment's category
     const relevantTCs = tcEntries.filter(

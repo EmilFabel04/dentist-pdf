@@ -8,7 +8,8 @@ import styles from "./layout.module.css";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard" },
-  { href: "/consultation", label: "New Consultation" },
+  { href: "/estimates/new", label: "New Estimate" },
+  { href: "/reports/new", label: "New Report" },
   { href: "/patients", label: "Patients" },
   { href: "/treatments", label: "Treatments" },
   { href: "/settings", label: "Settings" },

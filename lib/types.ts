@@ -87,6 +87,25 @@ export type Consultation = {
   createdAt: string;
 };
 
+export type Estimate = {
+  id: string;
+  date: string;
+  transcript: string;
+  selectedTreatments: SelectedTreatment[];
+  appointmentCount: number;
+  createdAt: string;
+};
+
+export type PatientReport = {
+  id: string;
+  date: string;
+  transcript: string;
+  report: Report;
+  photoCount: number;
+  xrayCount: number;
+  createdAt: string;
+};
+
 export type UserProfile = {
   practiceId: string;
   role: "dentist";

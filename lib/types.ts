@@ -2,6 +2,9 @@ export type TreatmentCode = {
   code: string;
   description: string;
   price: number;
+  icd10?: string;
+  labFee?: number;
+  implantFee?: number;
 };
 
 export type Treatment = {
@@ -38,6 +41,7 @@ export type PracticeSettings = {
   vatRate: number;
   quoteValidityDays: number;
   defaultPaymentTerms: string;
+  basicCodes?: string[];
 };
 
 export type Report = {
@@ -86,4 +90,14 @@ export type Consultation = {
 export type UserProfile = {
   practiceId: string;
   role: "dentist";
+};
+
+export type ParsedTreatment = {
+  code: string;
+  description: string;
+  icd10: string;
+  unitCost: number;
+  labFee: number;
+  implantFee: number;
+  source: string;
 };

@@ -127,6 +127,10 @@ export default function TreatmentsPage() {
                   labFee: 0,
                   implantFee: 0,
                   source: "Claude",
+                  category: t.category || "other",
+                  termsAndConditions: t.termsAndConditions || "",
+                  warranty: "",
+                  isLabFee: false,
                 });
               }
             }
@@ -348,22 +352,28 @@ export default function TreatmentsPage() {
 
       {parsedTreatments.length > 0 && (
         <div className={styles.reviewSection}>
-          <h3>Review Extracted Treatments ({parsedTreatments.length})</h3>
+          <h3>Review Extracted Treatments</h3>
+          <div className={styles.parseStats}>
+            {parsedTreatments.filter(t => !t.isLabFee).length} procedures,{" "}
+            {parsedTreatments.filter(t => t.isLabFee).length} lab fees,{" "}
+            {parsedTreatments.filter(t => t.category === "aesthetic").length} aesthetic,{" "}
+            {parsedTreatments.filter(t => t.termsAndConditions).length} with T&Cs
+          </div>
           <table className={styles.reviewTable}>
             <thead>
               <tr>
                 <th>Code</th>
                 <th>Description</th>
+                <th>Category</th>
                 <th>ICD-10</th>
-                <th>Unit Cost</th>
-                <th>Lab Fee</th>
-                <th>Source</th>
+                <th>Price</th>
+                <th>T&Cs</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
               {parsedTreatments.map((t, ti) => (
-                <tr key={ti}>
+                <tr key={ti} style={t.isLabFee ? { opacity: 0.6 } : undefined}>
                   <td>
                     <input
                       className={styles.input}
@@ -381,13 +391,9 @@ export default function TreatmentsPage() {
                     />
                   </td>
                   <td>
-                    <input
-                      className={styles.input}
-                      value={t.icd10}
-                      onChange={(e) => updateParsed(ti, "icd10", e.target.value)}
-                      style={{ width: 80 }}
-                    />
+                    <span className={styles.category}>{t.category}</span>
                   </td>
+                  <td style={{ fontSize: "0.8rem", color: "#666" }}>{t.icd10 || "—"}</td>
                   <td>
                     <input
                       className={styles.input}
@@ -396,24 +402,15 @@ export default function TreatmentsPage() {
                       onChange={(e) =>
                         updateParsed(ti, "unitCost", parseFloat(e.target.value) || 0)
                       }
-                      style={{ width: 80 }}
+                      style={{ width: 90 }}
                     />
                   </td>
-                  <td>
-                    <input
-                      className={styles.input}
-                      type="number"
-                      value={t.labFee}
-                      onChange={(e) =>
-                        updateParsed(ti, "labFee", parseFloat(e.target.value) || 0)
-                      }
-                      style={{ width: 80 }}
-                    />
+                  <td style={{ fontSize: "0.75rem", color: t.termsAndConditions ? "#198038" : "#ccc" }}>
+                    {t.termsAndConditions ? "Yes" : "—"}
                   </td>
-                  <td style={{ fontSize: "0.8rem", color: "#666" }}>{t.source}</td>
                   <td>
                     <button className={styles.smallBtn} onClick={() => removeParsed(ti)}>
-                      Remove
+                      ×
                     </button>
                   </td>
                 </tr>
@@ -422,7 +419,14 @@ export default function TreatmentsPage() {
           </table>
           <div className={styles.confirmBar}>
             <button className={styles.saveBtn} onClick={saveParsed}>
-              Save All
+              Save All ({parsedTreatments.length} treatments)
+            </button>
+            <button
+              className={styles.cancelBtn}
+              onClick={() => setParsedTreatments([])}
+              style={{ marginLeft: 8 }}
+            >
+              Discard
             </button>
           </div>
         </div>

@@ -100,4 +100,8 @@ export type ParsedTreatment = {
   labFee: number;
   implantFee: number;
   source: string;
+  category: string;
+  termsAndConditions: string;
+  warranty: string;
+  isLabFee: boolean;
 };

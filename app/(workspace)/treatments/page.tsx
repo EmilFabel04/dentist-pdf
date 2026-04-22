@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/lib/auth";
-import type { Treatment, TreatmentCode } from "@/lib/types";
+import type { Treatment, TreatmentCode, ParsedTreatment } from "@/lib/types";
 import styles from "./page.module.css";
 
 const CATEGORIES = [
+  "aesthetic",
   "preventive",
   "restorative",
   "endodontic",
@@ -17,23 +18,16 @@ const CATEGORIES = [
   "other",
 ];
 
-type ParsedTreatment = {
-  name: string;
-  category: string;
-  codes: TreatmentCode[];
-  termsAndConditions: string;
-};
-
 export default function TreatmentsPage() {
   const { getToken } = useAuth();
 
-  /* ── Upload state ────────────────────────────────────────────── */
+  /* -- Upload state ------------------------------------------------ */
   const [dragActive, setDragActive] = useState(false);
   const [parsing, setParsing] = useState(false);
-  const [parsed, setParsed] = useState<ParsedTreatment[]>([]);
+  const [parsedTreatments, setParsedTreatments] = useState<ParsedTreatment[]>([]);
   const [uploadMsg, setUploadMsg] = useState("");
 
-  /* ── Management state ────────────────────────────────────────── */
+  /* -- Management state -------------------------------------------- */
   const [treatments, setTreatments] = useState<Treatment[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -42,7 +36,7 @@ export default function TreatmentsPage() {
   const [editData, setEditData] = useState<Omit<Treatment, "id"> | null>(null);
   const [addMode, setAddMode] = useState(false);
 
-  /* ── Load treatments ─────────────────────────────────────────── */
+  /* -- Load treatments --------------------------------------------- */
   async function loadTreatments() {
     const token = await getToken();
     if (!token) return;
@@ -60,58 +54,92 @@ export default function TreatmentsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ── File parsing ────────────────────────────────────────────── */
+  /* -- File parsing ------------------------------------------------ */
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
     const file = files[0];
     const ext = file.name.split(".").pop()?.toLowerCase();
-
-    let content = "";
-
-    if (ext === "xlsx") {
-      const ExcelJS = (await import("exceljs")).default;
-      const workbook = new ExcelJS.Workbook();
-      const arrayBuffer = await file.arrayBuffer();
-      await workbook.xlsx.load(arrayBuffer);
-      let text = "";
-      workbook.eachSheet((sheet) => {
-        sheet.eachRow((row) => {
-          const values = row.values as (string | number | null)[];
-          text += values.slice(1).join("\t") + "\n";
-        });
-      });
-      content = text;
-    } else {
-      content = await file.text();
-    }
-
-    if (!content.trim()) {
-      setUploadMsg("Could not read file content.");
-      return;
-    }
+    const token = await getToken();
 
     setParsing(true);
     setUploadMsg("");
-    setParsed([]);
+    setParsedTreatments([]);
 
-    const token = await getToken();
-    const res = await fetch("/api/parse-treatments", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ content, filename: file.name }),
-    });
+    try {
+      if (ext === "xlsx") {
+        // Send raw file as FormData — server parses with ExcelJS
+        const formData = new FormData();
+        formData.append("file", file);
 
-    setParsing(false);
+        const res = await fetch("/api/parse-treatments", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        });
 
-    if (res.ok) {
-      const data = await res.json();
-      setParsed(data.treatments ?? []);
-    } else {
-      const err = await res.json().catch(() => ({ error: "Parse failed" }));
-      setUploadMsg(err.error || "Parse failed");
+        setParsing(false);
+
+        if (res.ok) {
+          const data = await res.json();
+          setParsedTreatments(data.treatments ?? []);
+          if (data.count === 0) {
+            setUploadMsg("No treatments found in the spreadsheet.");
+          }
+        } else {
+          const err = await res.json().catch(() => ({ error: "Parse failed" }));
+          setUploadMsg(err.error || "Parse failed");
+        }
+      } else {
+        // Legacy: read file as text, send JSON to Claude-based parser
+        let content = "";
+        content = await file.text();
+
+        if (!content.trim()) {
+          setParsing(false);
+          setUploadMsg("Could not read file content.");
+          return;
+        }
+
+        const res = await fetch("/api/parse-treatments", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ content, filename: file.name }),
+        });
+
+        setParsing(false);
+
+        if (res.ok) {
+          const data = await res.json();
+          // Claude returns the old format — adapt to ParsedTreatment[]
+          const claudeResults = data.treatments ?? [];
+          const adapted: ParsedTreatment[] = [];
+          for (const t of claudeResults) {
+            if (t.codes && Array.isArray(t.codes)) {
+              for (const c of t.codes) {
+                adapted.push({
+                  code: c.code || "",
+                  description: c.description || t.name || "",
+                  icd10: "",
+                  unitCost: c.price || 0,
+                  labFee: 0,
+                  implantFee: 0,
+                  source: "Claude",
+                });
+              }
+            }
+          }
+          setParsedTreatments(adapted);
+        } else {
+          const err = await res.json().catch(() => ({ error: "Parse failed" }));
+          setUploadMsg(err.error || "Parse failed");
+        }
+      }
+    } catch {
+      setParsing(false);
+      setUploadMsg("An error occurred while parsing the file.");
     }
   }
 
@@ -130,7 +158,7 @@ export default function TreatmentsPage() {
     handleFiles(e.dataTransfer.files);
   }
 
-  /* ── Save parsed treatments ──────────────────────────────────── */
+  /* -- Save parsed treatments -------------------------------------- */
   async function saveParsed() {
     const token = await getToken();
     const res = await fetch("/api/admin/treatments/batch", {
@@ -139,42 +167,27 @@ export default function TreatmentsPage() {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ treatments: parsed }),
+      body: JSON.stringify({ parsed: parsedTreatments }),
     });
     if (res.ok) {
-      setUploadMsg(`${parsed.length} treatments saved!`);
-      setParsed([]);
+      const data = await res.json();
+      setUploadMsg(`${data.count} treatments saved!`);
+      setParsedTreatments([]);
       loadTreatments();
     }
   }
 
   function removeParsed(index: number) {
-    setParsed((prev) => prev.filter((_, i) => i !== index));
+    setParsedTreatments((prev) => prev.filter((_, i) => i !== index));
   }
 
-  function updateParsed(index: number, field: string, value: string) {
-    setParsed((prev) =>
+  function updateParsed(index: number, field: keyof ParsedTreatment, value: string | number) {
+    setParsedTreatments((prev) =>
       prev.map((t, i) => (i === index ? { ...t, [field]: value } : t))
     );
   }
 
-  function updateParsedCode(
-    tIndex: number,
-    cIndex: number,
-    field: keyof TreatmentCode,
-    value: string | number
-  ) {
-    setParsed((prev) =>
-      prev.map((t, i) => {
-        if (i !== tIndex) return t;
-        const codes = [...t.codes];
-        codes[cIndex] = { ...codes[cIndex], [field]: value };
-        return { ...t, codes };
-      })
-    );
-  }
-
-  /* ── Management actions ──────────────────────────────────────── */
+  /* -- Management actions ------------------------------------------ */
   const filtered = useMemo(() => {
     let list = treatments;
     if (filterCat) list = list.filter((t) => t.category === filterCat);
@@ -305,12 +318,12 @@ export default function TreatmentsPage() {
     return `${min.toFixed(2)} - ${max.toFixed(2)}`;
   }
 
-  /* ── Render ──────────────────────────────────────────────────── */
+  /* -- Render ------------------------------------------------------ */
   return (
     <div>
       <h1 className={styles.heading}>Treatments</h1>
 
-      {/* ═══ UPLOAD SECTION ═══ */}
+      {/* === UPLOAD SECTION === */}
       <h2 className={styles.sectionHeading}>Upload Treatments</h2>
 
       <div
@@ -330,73 +343,74 @@ export default function TreatmentsPage() {
         />
       </div>
 
-      {parsing && <p className={styles.uploadStatus}>Parsing with Claude...</p>}
+      {parsing && <p className={styles.uploadStatus}>Parsing spreadsheet...</p>}
       {uploadMsg && <p className={styles.successMsg}>{uploadMsg}</p>}
 
-      {parsed.length > 0 && (
+      {parsedTreatments.length > 0 && (
         <div className={styles.reviewSection}>
-          <h3>Review Extracted Treatments ({parsed.length})</h3>
+          <h3>Review Extracted Treatments ({parsedTreatments.length})</h3>
           <table className={styles.reviewTable}>
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Category</th>
-                <th>Codes</th>
-                <th>T&amp;Cs</th>
+                <th>Code</th>
+                <th>Description</th>
+                <th>ICD-10</th>
+                <th>Unit Cost</th>
+                <th>Lab Fee</th>
+                <th>Source</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              {parsed.map((t, ti) => (
+              {parsedTreatments.map((t, ti) => (
                 <tr key={ti}>
                   <td>
                     <input
                       className={styles.input}
-                      value={t.name}
-                      onChange={(e) => updateParsed(ti, "name", e.target.value)}
+                      value={t.code}
+                      onChange={(e) => updateParsed(ti, "code", e.target.value)}
+                      style={{ width: 80 }}
                     />
-                  </td>
-                  <td>
-                    <select
-                      className={styles.filterSelect}
-                      value={t.category}
-                      onChange={(e) => updateParsed(ti, "category", e.target.value)}
-                    >
-                      {CATEGORIES.map((c) => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td>
-                    {t.codes.map((code, ci) => (
-                      <div key={ci} style={{ fontSize: "0.8rem", marginBottom: 2 }}>
-                        <input
-                          style={{ width: 60 }}
-                          value={code.code}
-                          onChange={(e) => updateParsedCode(ti, ci, "code", e.target.value)}
-                        />
-                        <input
-                          style={{ width: 120, marginLeft: 4 }}
-                          value={code.description}
-                          onChange={(e) => updateParsedCode(ti, ci, "description", e.target.value)}
-                        />
-                        <input
-                          style={{ width: 60, marginLeft: 4 }}
-                          type="number"
-                          value={code.price}
-                          onChange={(e) => updateParsedCode(ti, ci, "price", parseFloat(e.target.value) || 0)}
-                        />
-                      </div>
-                    ))}
                   </td>
                   <td>
                     <input
                       className={styles.input}
-                      value={t.termsAndConditions}
-                      onChange={(e) => updateParsed(ti, "termsAndConditions", e.target.value)}
-                      style={{ width: 120 }}
+                      value={t.description}
+                      onChange={(e) => updateParsed(ti, "description", e.target.value)}
+                      style={{ width: 200 }}
                     />
                   </td>
+                  <td>
+                    <input
+                      className={styles.input}
+                      value={t.icd10}
+                      onChange={(e) => updateParsed(ti, "icd10", e.target.value)}
+                      style={{ width: 80 }}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      className={styles.input}
+                      type="number"
+                      value={t.unitCost}
+                      onChange={(e) =>
+                        updateParsed(ti, "unitCost", parseFloat(e.target.value) || 0)
+                      }
+                      style={{ width: 80 }}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      className={styles.input}
+                      type="number"
+                      value={t.labFee}
+                      onChange={(e) =>
+                        updateParsed(ti, "labFee", parseFloat(e.target.value) || 0)
+                      }
+                      style={{ width: 80 }}
+                    />
+                  </td>
+                  <td style={{ fontSize: "0.8rem", color: "#666" }}>{t.source}</td>
                   <td>
                     <button className={styles.smallBtn} onClick={() => removeParsed(ti)}>
                       Remove
@@ -414,7 +428,7 @@ export default function TreatmentsPage() {
         </div>
       )}
 
-      {/* ═══ MANAGEMENT SECTION ═══ */}
+      {/* === MANAGEMENT SECTION === */}
       <h2 className={styles.sectionHeading}>Manage Treatments</h2>
 
       <div className={styles.toolbar}>
@@ -431,7 +445,9 @@ export default function TreatmentsPage() {
         >
           <option value="">All Categories</option>
           {CATEGORIES.map((c) => (
-            <option key={c} value={c}>{c}</option>
+            <option key={c} value={c}>
+              {c}
+            </option>
           ))}
         </select>
         <button className={styles.addBtn} onClick={startAdd}>
@@ -459,7 +475,9 @@ export default function TreatmentsPage() {
                 onChange={(e) => updateEdit("category", e.target.value)}
               >
                 {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>{c}</option>
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
                 ))}
               </select>
             </div>
@@ -502,7 +520,9 @@ export default function TreatmentsPage() {
                       />
                     </td>
                     <td>
-                      <button className={styles.smallBtn} onClick={() => removeCode(i)}>X</button>
+                      <button className={styles.smallBtn} onClick={() => removeCode(i)}>
+                        X
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -524,8 +544,12 @@ export default function TreatmentsPage() {
           </div>
 
           <div className={styles.editorActions}>
-            <button className={styles.saveBtn} onClick={saveEdit}>Save</button>
-            <button className={styles.cancelBtn} onClick={cancelEdit}>Cancel</button>
+            <button className={styles.saveBtn} onClick={saveEdit}>
+              Save
+            </button>
+            <button className={styles.cancelBtn} onClick={cancelEdit}>
+              Cancel
+            </button>
           </div>
         </div>
       )}
@@ -553,7 +577,9 @@ export default function TreatmentsPage() {
                   onClick={() => (expandedId === t.id ? cancelEdit() : startEdit(t))}
                 >
                   <td>{t.name}</td>
-                  <td><span className={styles.category}>{t.category}</span></td>
+                  <td>
+                    <span className={styles.category}>{t.category}</span>
+                  </td>
                   <td>{t.codes.length}</td>
                   <td className={styles.priceRange}>{priceRange(t.codes)}</td>
                 </tr>
@@ -578,7 +604,9 @@ export default function TreatmentsPage() {
                               onChange={(e) => updateEdit("category", e.target.value)}
                             >
                               {CATEGORIES.map((c) => (
-                                <option key={c} value={c}>{c}</option>
+                                <option key={c} value={c}>
+                                  {c}
+                                </option>
                               ))}
                             </select>
                           </div>
@@ -609,7 +637,9 @@ export default function TreatmentsPage() {
                                     <input
                                       className={styles.input}
                                       value={c.description}
-                                      onChange={(e) => updateCode(i, "description", e.target.value)}
+                                      onChange={(e) =>
+                                        updateCode(i, "description", e.target.value)
+                                      }
                                     />
                                   </td>
                                   <td>
@@ -617,17 +647,28 @@ export default function TreatmentsPage() {
                                       className={styles.input}
                                       type="number"
                                       value={c.price}
-                                      onChange={(e) => updateCode(i, "price", parseFloat(e.target.value) || 0)}
+                                      onChange={(e) =>
+                                        updateCode(i, "price", parseFloat(e.target.value) || 0)
+                                      }
                                     />
                                   </td>
                                   <td>
-                                    <button className={styles.smallBtn} onClick={() => removeCode(i)}>X</button>
+                                    <button
+                                      className={styles.smallBtn}
+                                      onClick={() => removeCode(i)}
+                                    >
+                                      X
+                                    </button>
                                   </td>
                                 </tr>
                               ))}
                             </tbody>
                           </table>
-                          <button className={styles.smallBtn} onClick={addCode} style={{ marginTop: 4 }}>
+                          <button
+                            className={styles.smallBtn}
+                            onClick={addCode}
+                            style={{ marginTop: 4 }}
+                          >
                             + Add Code
                           </button>
                         </div>
@@ -643,9 +684,15 @@ export default function TreatmentsPage() {
                         </div>
 
                         <div className={styles.editorActions}>
-                          <button className={styles.saveBtn} onClick={saveEdit}>Save</button>
-                          <button className={styles.cancelBtn} onClick={cancelEdit}>Cancel</button>
-                          <button className={styles.deleteBtn} onClick={deleteTreatment}>Delete</button>
+                          <button className={styles.saveBtn} onClick={saveEdit}>
+                            Save
+                          </button>
+                          <button className={styles.cancelBtn} onClick={cancelEdit}>
+                            Cancel
+                          </button>
+                          <button className={styles.deleteBtn} onClick={deleteTreatment}>
+                            Delete
+                          </button>
                         </div>
                       </div>
                     </td>

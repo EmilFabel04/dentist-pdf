@@ -16,6 +16,7 @@ const EMPTY_SETTINGS: PracticeSettings = {
   vatRate: 0,
   quoteValidityDays: 30,
   defaultPaymentTerms: "",
+  basicCodes: [],
 };
 
 export default function SettingsPage() {
@@ -38,10 +39,9 @@ export default function SettingsPage() {
       }
       setLoading(false);
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [getToken]);
 
-  function update(field: keyof PracticeSettings, value: string | number) {
+  function update(field: keyof PracticeSettings, value: string | number | string[]) {
     setSettings((prev) => ({ ...prev, [field]: value }));
   }
 
@@ -171,6 +171,27 @@ export default function SettingsPage() {
             onChange={(e) => update("defaultPaymentTerms", e.target.value)}
             rows={3}
           />
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.fieldLabel}>Basic Codes (auto-added per appointment)</label>
+          <input
+            className={styles.input}
+            placeholder="e.g. 8109, 8109, 8110, 8145, 8304, 8158"
+            value={(settings.basicCodes ?? []).join(", ")}
+            onChange={(e) =>
+              update(
+                "basicCodes",
+                e.target.value
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean)
+              )
+            }
+          />
+          <span style={{ fontSize: "0.75rem", color: "#666", marginTop: 2 }}>
+            Comma-separated procedure codes added to every new appointment
+          </span>
         </div>
       </div>
 

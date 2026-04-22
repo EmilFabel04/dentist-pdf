@@ -609,3 +609,95 @@
   font-size: 0.9rem;
   margin-bottom: 16px;
 }
+
+/* ── Refine Estimate ──────────────────────────────────────── */
+
+.refineHint {
+  font-size: 0.85rem;
+  color: #666;
+  margin-bottom: 12px;
+}
+
+.refineActions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.refineBtn {
+  padding: 8px 16px;
+  background: #fff;
+  border: 1px solid #0f62fe;
+  color: #0f62fe;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.refineBtn:hover:not(:disabled) {
+  background: #e8edff;
+}
+
+.refineBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.refineVoice {
+  margin-bottom: 12px;
+}
+
+.refineTextBox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.refineTextarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  resize: vertical;
+  outline: none;
+}
+
+.refineTextarea:focus {
+  border-color: #0f62fe;
+}
+
+/* ── Appointment Count ────────────────────────────────────── */
+
+.appointmentCount {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.appointmentLabel {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #333;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.appointmentInput {
+  width: 60px;
+  padding: 6px 8px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  text-align: center;
+  font-size: 0.95rem;
+  font-family: inherit;
+}
+
+.appointmentInput:focus {
+  border-color: #0f62fe;
+  outline: none;
+}

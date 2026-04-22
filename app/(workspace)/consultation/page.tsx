@@ -80,6 +80,18 @@ function ConsultationInner() {
   const [practiceSettings, setPracticeSettings] =
     useState<PracticeSettings | null>(null);
 
+  // Refinement
+  const [refineMode, setRefineMode] = useState<"text" | "voice" | null>(null);
+  const [refineText, setRefineText] = useState("");
+  const [isRefining, setIsRefining] = useState(false);
+  const [refineRecording, setRefineRecording] = useState(false);
+  const [refineDuration, setRefineDuration] = useState(0);
+  const refineRecorderRef = useRef<MediaRecorder | null>(null);
+  const refineChunksRef = useRef<Blob[]>([]);
+  const refineTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Appointment count
+  const [appointmentCount, setAppointmentCount] = useState(1);
+
   // General
   const [error, setError] = useState("");
   const [savedId, setSavedId] = useState<string | null>(null);
@@ -328,6 +340,15 @@ function ConsultationInner() {
       setMatchedTreatments(matched);
       setAllTreatments(all);
 
+      // Load practice settings (for basic codes display)
+      const settingsRes = await fetch("/api/admin/settings", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (settingsRes.ok) {
+        const settings = await settingsRes.json();
+        setPracticeSettings(settings);
+      }
+
       // Pre-select matched treatments with all codes, quantity 1
       const preselected: SelectedTreatment[] = matched.map((t) => ({
         treatment: t,
@@ -499,6 +520,139 @@ function ConsultationInner() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  }
+
+  /* ── Refine estimate with Claude ──────────────────────────── */
+
+  async function startRefineRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      refineChunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) refineChunksRef.current.push(e.data);
+      };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(refineChunksRef.current, { type: "audio/webm" });
+        await transcribeAndRefine(blob);
+      };
+      recorder.start();
+      refineRecorderRef.current = recorder;
+      setRefineRecording(true);
+      setRefineDuration(0);
+      refineTimerRef.current = setInterval(() => setRefineDuration((d) => d + 1), 1000);
+    } catch {
+      setError("Microphone access denied");
+    }
+  }
+
+  function stopRefineRecording() {
+    refineRecorderRef.current?.stop();
+    setRefineRecording(false);
+    if (refineTimerRef.current) {
+      clearInterval(refineTimerRef.current);
+      refineTimerRef.current = null;
+    }
+  }
+
+  async function transcribeAndRefine(audioBlob: Blob) {
+    setIsRefining(true);
+    setError("");
+    try {
+      const token = await getToken();
+      if (!token) throw new Error("Not authenticated");
+
+      // Transcribe the audio
+      const formData = new FormData();
+      formData.append("audio", audioBlob, "refine.webm");
+      const transcribeRes = await fetch("/api/upload-audio", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      if (!transcribeRes.ok) throw new Error("Transcription failed");
+      const { transcript: instructions } = await transcribeRes.json();
+
+      await refineWithClaude(instructions, token);
+    } catch (err) {
+      setError((err as Error).message);
+      setIsRefining(false);
+    }
+  }
+
+  async function refineWithText() {
+    if (!refineText.trim()) return;
+    setIsRefining(true);
+    setError("");
+    try {
+      const token = await getToken();
+      if (!token) throw new Error("Not authenticated");
+      await refineWithClaude(refineText, token);
+      setRefineText("");
+    } catch (err) {
+      setError((err as Error).message);
+      setIsRefining(false);
+    }
+  }
+
+  async function refineWithClaude(instructions: string, token: string) {
+    const res = await fetch("/api/refine-estimate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        instructions,
+        currentTreatments: selectedTreatments,
+        allTreatments: allTreatments.map((t) => ({
+          id: t.id,
+          name: t.name,
+          category: t.category,
+          codes: t.codes,
+        })),
+      }),
+    });
+
+    if (!res.ok) throw new Error("Refinement failed");
+    const { updated } = await res.json();
+
+    // Map Claude's response back to SelectedTreatment[]
+    const newSelected: SelectedTreatment[] = updated
+      .map((u: { treatmentId: string; treatmentName: string; category: string; codes: { code: string; description: string; price: number; quantity: number }[] }) => {
+        const treatment = allTreatments.find((t) => t.id === u.treatmentId);
+        if (!treatment) return null;
+        return {
+          treatment,
+          selectedCodes: u.codes.map((c: { code: string; description: string; price: number; quantity: number }) => ({
+            code: c.code,
+            description: c.description,
+            price: c.price,
+            quantity: c.quantity,
+          })),
+        };
+      })
+      .filter(Boolean) as SelectedTreatment[];
+
+    setSelectedTreatments(newSelected);
+    setIsRefining(false);
+    setRefineMode(null);
+  }
+
+  /* ── Basic codes total ──────────────────────────────────────── */
+
+  function computeBasicCodesTotal(): number {
+    if (!practiceSettings?.basicCodes) return 0;
+    let total = 0;
+    for (const code of practiceSettings.basicCodes) {
+      const treatment = allTreatments.find((t) => t.codes.some((c) => c.code === code));
+      if (treatment) {
+        const tc = treatment.codes.find((c) => c.code === code);
+        if (tc) total += tc.price;
+      }
+    }
+    return total * appointmentCount;
   }
 
   /* ── Save consultation ────────────────────────────────────── */
@@ -827,6 +981,17 @@ function ConsultationInner() {
         report && (
           <div className={styles.section}>
             <div className={styles.sectionTitle}>Treatment Review</div>
+            <div className={styles.appointmentCount}>
+              <label className={styles.appointmentLabel}>Number of Appointments</label>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                className={styles.appointmentInput}
+                value={appointmentCount}
+                onChange={(e) => setAppointmentCount(Math.max(1, parseInt(e.target.value) || 1))}
+              />
+            </div>
             <p className={styles.treatmentHint}>
               Toggle treatments on/off and adjust quantities as needed.
             </p>
@@ -933,8 +1098,79 @@ function ConsultationInner() {
             <div className={styles.costTotal}>
               Total: {computeTotal().toFixed(2)}
             </div>
+
+            {practiceSettings?.basicCodes && practiceSettings.basicCodes.length > 0 && (
+              <div className={styles.costTotal} style={{ fontSize: "0.9rem", background: "#e8edff" }}>
+                Basic codes x{appointmentCount} appts: {computeBasicCodesTotal().toFixed(2)}
+                <br />
+                <strong>Grand Total: {(computeTotal() + computeBasicCodesTotal()).toFixed(2)}</strong>
+              </div>
+            )}
           </div>
         )}
+
+      {/* ── 5b. Refine Estimate ────────────────────────────────── */}
+      {phase === "review-treatments" && (
+        <div className={styles.section}>
+          <div className={styles.sectionTitle}>Refine Estimate</div>
+          <p className={styles.refineHint}>
+            Record or type instructions to adjust the estimate (e.g. &quot;remove the crown, add two more fillings&quot;)
+          </p>
+          <div className={styles.refineActions}>
+            <button
+              className={styles.refineBtn}
+              onClick={() => setRefineMode(refineMode === "voice" ? null : "voice")}
+              disabled={isRefining}
+            >
+              {refineMode === "voice" ? "Cancel Recording" : "Record Instructions"}
+            </button>
+            <button
+              className={styles.refineBtn}
+              onClick={() => setRefineMode(refineMode === "text" ? null : "text")}
+              disabled={isRefining}
+            >
+              {refineMode === "text" ? "Cancel" : "Type Instructions"}
+            </button>
+          </div>
+
+          {refineMode === "voice" && (
+            <div className={styles.refineVoice}>
+              {!refineRecording ? (
+                <button className={styles.recordBtn} onClick={startRefineRecording} disabled={isRefining}>
+                  Start Recording
+                </button>
+              ) : (
+                <button className={styles.stopBtn} onClick={stopRefineRecording}>
+                  Stop ({formatDuration(refineDuration)})
+                </button>
+              )}
+            </div>
+          )}
+
+          {refineMode === "text" && (
+            <div className={styles.refineTextBox}>
+              <textarea
+                className={styles.refineTextarea}
+                placeholder="e.g. Remove the root canal, add 2x composite fillings, change the crown to porcelain..."
+                value={refineText}
+                onChange={(e) => setRefineText(e.target.value)}
+                rows={3}
+              />
+              <button
+                className={styles.primaryBtn}
+                onClick={refineWithText}
+                disabled={!refineText.trim() || isRefining}
+              >
+                {isRefining ? "Refining..." : "Apply Changes"}
+              </button>
+            </div>
+          )}
+
+          {isRefining && (
+            <div className={styles.status}>Claude is adjusting the estimate...</div>
+          )}
+        </div>
+      )}
 
       {/* ── 6. Generate Documents + Save ───────────────────────── */}
       {phase === "review-treatments" && (

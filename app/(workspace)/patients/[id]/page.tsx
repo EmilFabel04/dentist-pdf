@@ -56,8 +56,7 @@ export default function PatientDetailPage() {
       setLoading(false);
     }
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, getToken]);
 
   async function handleSave() {
     const token = await getToken();

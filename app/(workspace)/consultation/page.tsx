@@ -111,8 +111,7 @@ function ConsultationInner() {
         setSelectedPatient(p);
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialPatientId]);
+  }, [initialPatientId, getToken]);
 
   /* ── Patient search ───────────────────────────────────────── */
 

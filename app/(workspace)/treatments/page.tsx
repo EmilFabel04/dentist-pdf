@@ -51,8 +51,7 @@ export default function TreatmentsPage() {
 
   useEffect(() => {
     loadTreatments();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [getToken]);
 
   /* -- File parsing ------------------------------------------------ */
   async function handleFiles(files: FileList | null) {

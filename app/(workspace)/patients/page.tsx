@@ -35,8 +35,7 @@ export default function PatientsPage() {
 
   useEffect(() => {
     loadPatients();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [getToken]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return patients;

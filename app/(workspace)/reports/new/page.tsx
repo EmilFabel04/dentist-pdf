@@ -71,6 +71,16 @@ function NewReportInner() {
   const [docxBlob, setDocxBlob] = useState<Blob | null>(null);
   const [pptxBlob, setPptxBlob] = useState<Blob | null>(null);
 
+  // Refinement
+  const [refineMode, setRefineMode] = useState<"text" | "voice" | null>(null);
+  const [refineText, setRefineText] = useState("");
+  const [isRefining, setIsRefining] = useState(false);
+  const [refineRecording, setRefineRecording] = useState(false);
+  const [refineDuration, setRefineDuration] = useState(0);
+  const refineRecorderRef = useRef<MediaRecorder | null>(null);
+  const refineChunksRef = useRef<Blob[]>([]);
+  const refineTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // General
   const [error, setError] = useState("");
   const [savedId, setSavedId] = useState<string | null>(null);
@@ -332,6 +342,96 @@ function NewReportInner() {
       setError((err as Error).message);
       setPhase("idle");
     }
+  }
+
+  /* ── Refine report with Claude ─────────────────────────────── */
+
+  async function startRefineRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      refineChunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) refineChunksRef.current.push(e.data);
+      };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(refineChunksRef.current, { type: "audio/webm" });
+        await transcribeAndRefine(blob);
+      };
+      recorder.start();
+      refineRecorderRef.current = recorder;
+      setRefineRecording(true);
+      setRefineDuration(0);
+      refineTimerRef.current = setInterval(() => setRefineDuration((d) => d + 1), 1000);
+    } catch {
+      setError("Microphone access denied");
+    }
+  }
+
+  function stopRefineRecording() {
+    refineRecorderRef.current?.stop();
+    setRefineRecording(false);
+    if (refineTimerRef.current) {
+      clearInterval(refineTimerRef.current);
+      refineTimerRef.current = null;
+    }
+  }
+
+  async function transcribeAndRefine(audioBlob: Blob) {
+    setIsRefining(true);
+    setError("");
+    try {
+      const token = await getToken();
+      if (!token) throw new Error("Not authenticated");
+
+      const formData = new FormData();
+      formData.append("audio", audioBlob, "refine.webm");
+      const transcribeRes = await fetch("/api/upload-audio", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      if (!transcribeRes.ok) throw new Error("Transcription failed");
+      const { transcript: instructions } = await transcribeRes.json();
+
+      await refineWithClaude(instructions, token);
+    } catch (err) {
+      setError((err as Error).message);
+      setIsRefining(false);
+    }
+  }
+
+  async function refineWithText() {
+    if (!refineText.trim() || !report) return;
+    setIsRefining(true);
+    setError("");
+    try {
+      const token = await getToken();
+      if (!token) throw new Error("Not authenticated");
+      await refineWithClaude(refineText, token);
+      setRefineText("");
+    } catch (err) {
+      setError((err as Error).message);
+      setIsRefining(false);
+    }
+  }
+
+  async function refineWithClaude(instructions: string, token: string) {
+    if (!report) return;
+    const res = await fetch("/api/refine-report", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ instructions, currentReport: report }),
+    });
+    if (!res.ok) throw new Error("Refinement failed");
+    const { report: updated } = await res.json();
+    setReport(updated);
+    setIsRefining(false);
+    setRefineMode(null);
   }
 
   /* ── Generate Documents ───────────────────────────────────── */
@@ -810,6 +910,69 @@ function NewReportInner() {
               <div className={styles.previewTitle}>Follow-up</div>
               <p className={styles.previewPara}>{report.followUp}</p>
             </>
+          )}
+        </div>
+      )}
+
+      {/* ── 7b. Refine Report ──────────────────────────────────── */}
+      {report && phase !== "done" && phase !== "saved" && (
+        <div className={styles.section}>
+          <div className={styles.sectionTitle}>Refine Report</div>
+          <p className={styles.refineHint}>
+            Record or type instructions to adjust the report (e.g. &quot;add a finding for tooth 14, change the follow-up to 3 months&quot;)
+          </p>
+          <div className={styles.refineActions}>
+            <button
+              className={styles.refineBtn}
+              onClick={() => setRefineMode(refineMode === "voice" ? null : "voice")}
+              disabled={isRefining}
+            >
+              {refineMode === "voice" ? "Cancel Recording" : "Record Instructions"}
+            </button>
+            <button
+              className={styles.refineBtn}
+              onClick={() => setRefineMode(refineMode === "text" ? null : "text")}
+              disabled={isRefining}
+            >
+              {refineMode === "text" ? "Cancel" : "Type Instructions"}
+            </button>
+          </div>
+
+          {refineMode === "voice" && (
+            <div className={styles.refineVoice}>
+              {!refineRecording ? (
+                <button className={styles.recordBtn} onClick={startRefineRecording} disabled={isRefining}>
+                  Start Recording
+                </button>
+              ) : (
+                <button className={styles.stopBtn} onClick={stopRefineRecording}>
+                  Stop ({formatDuration(refineDuration)})
+                </button>
+              )}
+            </div>
+          )}
+
+          {refineMode === "text" && (
+            <div className={styles.refineTextBox}>
+              <textarea
+                className={styles.refineTextarea}
+                placeholder="e.g. Add a finding for tooth 14 with decay, change severity of tooth 21 to urgent, update follow-up to 6 weeks..."
+                value={refineText}
+                onChange={(e) => setRefineText(e.target.value)}
+                rows={3}
+              />
+              <button
+                className={styles.primaryBtn}
+                onClick={refineWithText}
+                disabled={!refineText.trim() || isRefining}
+              >
+                {isRefining ? "Refining..." : "Apply Changes"}
+              </button>
+            </div>
+          )}
+
+          {isRefining && (
+            <div className={styles.status}>Claude is adjusting the report...</div>
           )}
         </div>
       )}

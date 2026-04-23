@@ -462,3 +462,63 @@
 .successMsg a:hover {
   text-decoration: underline;
 }
+
+/* ── Refine ───────────────────────────────────────────────── */
+
+.refineHint {
+  font-size: 0.85rem;
+  color: #666;
+  margin-bottom: 12px;
+}
+
+.refineActions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.refineBtn {
+  padding: 8px 16px;
+  background: #fff;
+  border: 1px solid #579158;
+  color: #579158;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.refineBtn:hover:not(:disabled) {
+  background: #e8f5e9;
+}
+
+.refineBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.refineVoice {
+  margin-bottom: 12px;
+}
+
+.refineTextBox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.refineTextarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  resize: vertical;
+  outline: none;
+}
+
+.refineTextarea:focus {
+  border-color: #579158;
+}

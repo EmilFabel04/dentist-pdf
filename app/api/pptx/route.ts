@@ -76,41 +76,35 @@ export async function POST(request: Request) {
       zip.file(slide2Path, slide2Xml);
     }
 
-    // ── Slide 3: Replace extra oral photos ───────────────
-    // Template images: image6.jpeg through image11.jpeg
-    const extraOralMap: Record<string, number> = {
-      "image6.jpeg": 0,
-      "image7.jpeg": 1,
-      "image8.jpeg": 2,
-      "image9.jpeg": 3,
-      "image10.jpeg": 4,
-      "image11.jpeg": 5,
-    };
-    for (const [filename, index] of Object.entries(extraOralMap)) {
-      if (index < extraOralPhotos.length) {
-        const imageData = dataUrlToBuffer(extraOralPhotos[index]);
-        if (imageData) {
-          zip.file(`ppt/media/${filename}`, imageData);
-        }
-      }
+    // ── Blank out ALL patient photo slots first ────────────
+    // This ensures no template sample photos leak through
+    const blankPng = createBlankPng();
+    const allPatientImages = [
+      "image5.jpeg",                                       // slide 2 patient photo
+      "image6.jpeg", "image7.jpeg", "image8.jpeg",         // slide 3 extra oral
+      "image9.jpeg", "image10.jpeg", "image11.jpeg",
+      "image12.jpeg", "image13.jpeg", "image14.jpeg",      // slide 4 intra oral
+      "image15.jpeg", "image16.jpeg", "image17.jpeg",
+      "image18.jpg", "image19.jpg",                        // slide 5 xrays
+      "image20.jpg", "image21.jpg", "image22.jpg",         // slide 6 xrays
+      "image23.jpg", "image24.png", "image25.jpg",         // slides 7-10 before/after
+    ];
+    for (const img of allPatientImages) {
+      zip.file(`ppt/media/${img}`, blankPng);
     }
 
-    // ── Slide 4: Replace intra oral photos ───────────────
-    const intraOralMap: Record<string, number> = {
-      "image12.jpeg": 0,
-      "image13.jpeg": 1,
-      "image14.jpeg": 2,
-      "image15.jpeg": 3,
-      "image16.jpeg": 4,
-      "image17.jpeg": 5,
-    };
-    for (const [filename, index] of Object.entries(intraOralMap)) {
-      if (index < intraOralPhotos.length) {
-        const imageData = dataUrlToBuffer(intraOralPhotos[index]);
-        if (imageData) {
-          zip.file(`ppt/media/${filename}`, imageData);
-        }
-      }
+    // ── Slide 3: Fill extra oral photos ──────────────────
+    const extraOralSlots = ["image6.jpeg", "image7.jpeg", "image8.jpeg", "image9.jpeg", "image10.jpeg", "image11.jpeg"];
+    for (let i = 0; i < Math.min(extraOralPhotos.length, extraOralSlots.length); i++) {
+      const imageData = dataUrlToBuffer(extraOralPhotos[i]);
+      if (imageData) zip.file(`ppt/media/${extraOralSlots[i]}`, imageData);
+    }
+
+    // ── Slide 4: Fill intra oral photos ──────────────────
+    const intraOralSlots = ["image12.jpeg", "image13.jpeg", "image14.jpeg", "image15.jpeg", "image16.jpeg", "image17.jpeg"];
+    for (let i = 0; i < Math.min(intraOralPhotos.length, intraOralSlots.length); i++) {
+      const imageData = dataUrlToBuffer(intraOralPhotos[i]);
+      if (imageData) zip.file(`ppt/media/${intraOralSlots[i]}`, imageData);
     }
 
     // ── Slides 5-6: Replace X-rays ───────────────────────
@@ -404,6 +398,16 @@ function escapeXml(str: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;");
+}
+
+/**
+ * Create a minimal 1x1 transparent PNG to blank out template placeholders.
+ */
+function createBlankPng(): Buffer {
+  return Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQABNjN9GQAAAABJRElEQkSuQmCC",
+    "base64"
+  );
 }
 
 function slug(s: string) {

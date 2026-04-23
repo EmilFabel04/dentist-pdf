@@ -24,6 +24,8 @@ type Body = {
   extraOralPhotos?: string[]; // base64 data URLs
   intraOralPhotos?: string[];
   xrayImages?: string[];
+  beforePhotos?: string[];
+  afterPhotos?: string[];
   practice: {
     name: string;
     phone: string;
@@ -46,6 +48,8 @@ export async function POST(request: Request) {
       extraOralPhotos = [],
       intraOralPhotos = [],
       xrayImages = [],
+      beforePhotos = [],
+      afterPhotos = [],
     } = body;
 
     // Load template
@@ -122,6 +126,19 @@ export async function POST(request: Request) {
           zip.file(`ppt/media/${filename}`, imageData);
         }
       }
+    }
+
+    // ── Slides 7-10: Before/After photos ──────────────────
+    // Slide 7: Before/After — fill image23.jpg with first "after" photo
+    if (afterPhotos.length > 0) {
+      const img = dataUrlToBuffer(afterPhotos[0]);
+      if (img) zip.file("ppt/media/image23.jpg", img);
+    }
+
+    // Slide 9: Before/After alt — fill image25.jpg with first "before" photo
+    if (beforePhotos.length > 0) {
+      const img = dataUrlToBuffer(beforePhotos[0]);
+      if (img) zip.file("ppt/media/image25.jpg", img);
     }
 
     // ── Slide 11: Replace treatment options ──────────────

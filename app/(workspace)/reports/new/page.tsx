@@ -52,6 +52,8 @@ function NewReportInner() {
   const [extraOralPhotos, setExtraOralPhotos] = useState<XRay[]>([]);
   const [intraOralPhotos, setIntraOralPhotos] = useState<XRay[]>([]);
   const [xrays, setXrays] = useState<XRay[]>([]);
+  const [beforePhotos, setBeforePhotos] = useState<XRay[]>([]);
+  const [afterPhotos, setAfterPhotos] = useState<XRay[]>([]);
 
   // Recording
   const [phase, setPhase] = useState<Phase>("idle");
@@ -68,7 +70,7 @@ function NewReportInner() {
   const [practiceSettings, setPracticeSettings] = useState<PracticeSettings | null>(null);
 
   // Documents
-  const [docxBlob, setDocxBlob] = useState<Blob | null>(null);
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
   const [pptxBlob, setPptxBlob] = useState<Blob | null>(null);
 
   // Refinement
@@ -324,6 +326,14 @@ function NewReportInner() {
           base64: x.base64,
           mediaType: x.mediaType,
         })),
+        ...beforePhotos.map((x) => ({
+          base64: x.base64,
+          mediaType: x.mediaType,
+        })),
+        ...afterPhotos.map((x) => ({
+          base64: x.base64,
+          mediaType: x.mediaType,
+        })),
       ];
 
       const genRes = await fetch("/api/generate", {
@@ -457,15 +467,8 @@ function NewReportInner() {
 
       const today = new Date().toISOString().split("T")[0];
 
-      // All images as data URLs for docx
-      const allImageDataUrls = [
-        ...extraOralPhotos,
-        ...intraOralPhotos,
-        ...xrays,
-      ].map((x) => `data:${x.mediaType};base64,${x.base64}`);
-
-      // Generate DOCX
-      const docxRes = await fetch("/api/docx", {
+      // Generate Report PDF
+      const pdfRes = await fetch("/api/report-pdf", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -475,19 +478,34 @@ function NewReportInner() {
           patientName: selectedPatient.name,
           date: today,
           report,
-          imageDataUrls: allImageDataUrls,
+          extraOralPhotos: extraOralPhotos.map(
+            (x) => `data:${x.mediaType};base64,${x.base64}`
+          ),
+          intraOralPhotos: intraOralPhotos.map(
+            (x) => `data:${x.mediaType};base64,${x.base64}`
+          ),
+          xrayImages: xrays.map(
+            (x) => `data:${x.mediaType};base64,${x.base64}`
+          ),
+          beforePhotos: beforePhotos.map(
+            (x) => `data:${x.mediaType};base64,${x.base64}`
+          ),
+          afterPhotos: afterPhotos.map(
+            (x) => `data:${x.mediaType};base64,${x.base64}`
+          ),
           practice: settings
             ? {
                 name: settings.name,
-                address: settings.address,
                 phone: settings.phone,
                 email: settings.email,
+                address: settings.address,
+                vatNumber: settings.vatNumber,
               }
-            : undefined,
+            : { name: "", phone: "", email: "", address: "" },
         }),
       });
-      if (docxRes.ok) {
-        setDocxBlob(await docxRes.blob());
+      if (pdfRes.ok) {
+        setPdfBlob(await pdfRes.blob());
       }
 
       // Generate PPTX - send separate photo groups
@@ -510,6 +528,12 @@ function NewReportInner() {
             (x) => `data:${x.mediaType};base64,${x.base64}`
           ),
           xrayImages: xrays.map(
+            (x) => `data:${x.mediaType};base64,${x.base64}`
+          ),
+          beforePhotos: beforePhotos.map(
+            (x) => `data:${x.mediaType};base64,${x.base64}`
+          ),
+          afterPhotos: afterPhotos.map(
             (x) => `data:${x.mediaType};base64,${x.base64}`
           ),
           practice: settings
@@ -804,7 +828,73 @@ function NewReportInner() {
         )}
       </div>
 
-      {/* ── 5. Consultation Notes (Record or Type) ──────────────── */}
+      {/* ── 5. Before Photos ────────────────────────────────────── */}
+      <div className={styles.section}>
+        <div className={styles.sectionTitle}>Before Photos</div>
+        <p className={styles.hint}>Upload photos from before treatment (optional).</p>
+        <input
+          className={styles.fileInput}
+          type="file"
+          accept="image/jpeg,image/png"
+          multiple
+          onChange={(e) => handlePhotoUpload(e, setBeforePhotos)}
+        />
+        {beforePhotos.length > 0 && (
+          <div className={styles.thumbGrid}>
+            {beforePhotos.map((x, i) => (
+              <div key={i} className={styles.thumbWrap}>
+                <img
+                  src={x.previewUrl}
+                  alt={`Before ${i + 1}`}
+                  className={styles.thumb}
+                />
+                <button
+                  className={styles.removeBtn}
+                  onClick={() => removePhoto(i, setBeforePhotos)}
+                  title="Remove"
+                >
+                  x
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── 6. After Photos ─────────────────────────────────────── */}
+      <div className={styles.section}>
+        <div className={styles.sectionTitle}>After Photos</div>
+        <p className={styles.hint}>Upload photos from after treatment (optional).</p>
+        <input
+          className={styles.fileInput}
+          type="file"
+          accept="image/jpeg,image/png"
+          multiple
+          onChange={(e) => handlePhotoUpload(e, setAfterPhotos)}
+        />
+        {afterPhotos.length > 0 && (
+          <div className={styles.thumbGrid}>
+            {afterPhotos.map((x, i) => (
+              <div key={i} className={styles.thumbWrap}>
+                <img
+                  src={x.previewUrl}
+                  alt={`After ${i + 1}`}
+                  className={styles.thumb}
+                />
+                <button
+                  className={styles.removeBtn}
+                  onClick={() => removePhoto(i, setAfterPhotos)}
+                  title="Remove"
+                >
+                  x
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── 7. Consultation Notes (Record or Type) ──────────────── */}
       <div className={styles.section}>
         <div className={styles.sectionTitle}>Consultation Notes</div>
         <p className={styles.hint}>
@@ -989,17 +1079,17 @@ function NewReportInner() {
         <div className={styles.section}>
           <div className={styles.sectionTitle}>Documents</div>
           <div className={styles.downloadRow}>
-            {docxBlob && (
+            {pdfBlob && (
               <button
                 className={styles.downloadBtn}
                 onClick={() =>
                   downloadBlob(
-                    docxBlob,
-                    `report-${selectedPatient?.name.replace(/\s+/g, "-").toLowerCase()}-${new Date().toISOString().split("T")[0]}.docx`
+                    pdfBlob,
+                    `report-${selectedPatient?.name.replace(/\s+/g, "-").toLowerCase()}-${new Date().toISOString().split("T")[0]}.pdf`
                   )
                 }
               >
-                Download .docx
+                Download Report (.pdf)
               </button>
             )}
             {pptxBlob && (

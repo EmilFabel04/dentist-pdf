@@ -33,9 +33,9 @@ type Body = {
 function sectionHeading(text: string): Paragraph {
   return new Paragraph({
     spacing: { before: 360, after: 120 },
-    border: { bottom: { style: BorderStyle.SINGLE, size: 1, color: "3b82f6" } },
+    border: { bottom: { style: BorderStyle.SINGLE, size: 1, color: "579158" } },
     children: [
-      new TextRun({ text, bold: true, size: 28, color: "3b82f6" }),
+      new TextRun({ text, bold: true, size: 28, color: "579158" }),
     ],
   });
 }
@@ -43,7 +43,7 @@ function sectionHeading(text: string): Paragraph {
 function headerCell(text: string, width: number): TableCell {
   return new TableCell({
     width: { size: width, type: WidthType.PERCENTAGE },
-    shading: { fill: "f0f3f9" },
+    shading: { fill: "f1f8f1" },
     children: [
       new Paragraph({
         children: [new TextRun({ text, bold: true, size: 20 })],
@@ -100,7 +100,7 @@ export async function POST(request: Request) {
               text: practice.name,
               bold: true,
               size: 32,
-              color: "3b82f6",
+              color: "579158",
             }),
           ],
         }),

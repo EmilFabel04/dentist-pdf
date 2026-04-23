@@ -64,13 +64,13 @@
 }
 
 .input:focus {
-  border-color: #0f62fe;
+  border-color: #579158;
 }
 
 .submitBtn {
   width: 100%;
   padding: 12px;
-  background: #0f62fe;
+  background: #579158;
   color: #fff;
   font-weight: 700;
   border: none;
@@ -81,7 +81,7 @@
 }
 
 .submitBtn:hover {
-  background: #0043ce;
+  background: #3d6b3e;
 }
 
 .submitBtn:disabled {

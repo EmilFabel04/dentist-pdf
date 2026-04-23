@@ -40,9 +40,9 @@ export async function POST(request: Request) {
 
     const currency = settings.currency || "USD";
     const currencyFmt = `"${currency}" #,##0.00`;
-    const blueColor = "FF0F62FE";
-    const lightBlueBg = "FFE8EDFF";
-    const headerGrayBg = "FFF0F3F9";
+    const greenColor = "FF579158";
+    const lightGreenBg = "FFE8F5E9";
+    const headerGrayBg = "FFF1F8F1";
 
     const workbook = new ExcelJS.Workbook();
 
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     ws.mergeCells("A2:E2");
     const practiceNameCell = ws.getCell("A2");
     practiceNameCell.value = settings.name;
-    practiceNameCell.font = { bold: true, size: 14, color: { argb: blueColor } };
+    practiceNameCell.font = { bold: true, size: 14, color: { argb: greenColor } };
 
     // Row 3: Phone number
     ws.mergeCells("A3:E3");
@@ -122,7 +122,7 @@ export async function POST(request: Request) {
     ws.mergeCells("A16:E16");
     const planTitleCell = ws.getCell("A16");
     planTitleCell.value = "Proposed Treatment Plan:";
-    planTitleCell.font = { bold: true, size: 12, color: { argb: blueColor } };
+    planTitleCell.font = { bold: true, size: 12, color: { argb: greenColor } };
 
     // Row 17: Empty
 
@@ -179,11 +179,11 @@ export async function POST(request: Request) {
       ws.mergeCells(row, 1, row, 5);
       const apptHeaderCell = ws.getCell(row, 1);
       apptHeaderCell.value = `Appointment ${apptIdx + 1}`;
-      apptHeaderCell.font = { bold: true, size: 11, color: { argb: blueColor } };
+      apptHeaderCell.font = { bold: true, size: 11, color: { argb: greenColor } };
       apptHeaderCell.fill = {
         type: "pattern",
         pattern: "solid",
-        fgColor: { argb: lightBlueBg },
+        fgColor: { argb: lightGreenBg },
       };
       row++;
 
@@ -340,7 +340,7 @@ export async function POST(request: Request) {
     tcSheet.getCell(tcRow, 1).font = {
       bold: true,
       size: 16,
-      color: { argb: blueColor },
+      color: { argb: greenColor },
     };
     tcRow += 2;
 

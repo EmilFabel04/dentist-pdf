@@ -25,8 +25,8 @@ type Body = {
 };
 
 // Colors matching the dentist's branding
-const BRAND_BLUE = "1B3A5C";
-const ACCENT_GOLD = "C9A84C";
+const BRAND_GREEN = "579158";
+const ACCENT_GREEN = "b0d9a9";
 const DARK = "1a1a1a";
 const GRAY = "666666";
 const LIGHT_GRAY = "999999";
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     // SLIDE 1: Cover / Title Page
     // ══════════════════════════════════════════════════════
     const slide1 = pptx.addSlide();
-    slide1.background = { color: BRAND_BLUE };
+    slide1.background = { color: BRAND_GREEN };
 
     // Practice name + credentials
     slide1.addText(practice.name || "Dental Practice", {
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
     // Title
     slide1.addText("Treatment Plan\nDiscussion", {
       x: 0.8, y: 2.2, w: 11.5, h: 2.0,
-      fontSize: 44, fontFace: "Helvetica", color: ACCENT_GOLD, bold: true,
+      fontSize: 44, fontFace: "Helvetica", color: ACCENT_GREEN, bold: true,
       lineSpacingMultiple: 1.1,
     });
 
@@ -155,9 +155,9 @@ export async function POST(request: Request) {
 
       const rows: PptxGenJS.TableRow[] = [
         [
-          { text: "Tooth", options: { bold: true, color: WHITE, fill: { color: BRAND_BLUE }, fontSize: 10, align: "center" } },
-          { text: "Observation", options: { bold: true, color: WHITE, fill: { color: BRAND_BLUE }, fontSize: 10 } },
-          { text: "Severity", options: { bold: true, color: WHITE, fill: { color: BRAND_BLUE }, fontSize: 10, align: "center" } },
+          { text: "Tooth", options: { bold: true, color: WHITE, fill: { color: BRAND_GREEN }, fontSize: 10, align: "center" } },
+          { text: "Observation", options: { bold: true, color: WHITE, fill: { color: BRAND_GREEN }, fontSize: 10 } },
+          { text: "Severity", options: { bold: true, color: WHITE, fill: { color: BRAND_GREEN }, fontSize: 10, align: "center" } },
         ],
       ];
 
@@ -205,7 +205,7 @@ export async function POST(request: Request) {
     // Left side: Treatment Options
     slideTx.addText("Treatment Options", {
       x: 0.8, y: 1.8, w: 5.5, h: 0.4,
-      fontSize: 14, fontFace: "Helvetica", color: BRAND_BLUE, bold: true,
+      fontSize: 14, fontFace: "Helvetica", color: BRAND_GREEN, bold: true,
     });
 
     if (selectedTreatments.length > 0) {
@@ -230,7 +230,7 @@ export async function POST(request: Request) {
     // Right side: Estimated Time Frames
     slideTx.addText("Estimated Time Frames", {
       x: 7.0, y: 1.8, w: 5.5, h: 0.4,
-      fontSize: 14, fontFace: "Helvetica", color: BRAND_BLUE, bold: true,
+      fontSize: 14, fontFace: "Helvetica", color: BRAND_GREEN, bold: true,
     });
 
     slideTx.addText(report.followUp || "To be confirmed.", {
@@ -252,11 +252,11 @@ export async function POST(request: Request) {
     // SLIDE 10: Thank You / Contact Details
     // ══════════════════════════════════════════════════════
     const slideThanks = pptx.addSlide();
-    slideThanks.background = { color: BRAND_BLUE };
+    slideThanks.background = { color: BRAND_GREEN };
 
     slideThanks.addText("Thank You", {
       x: 0.8, y: 1.2, w: 11.5, h: 1.2,
-      fontSize: 44, fontFace: "Helvetica", color: ACCENT_GOLD, bold: true,
+      fontSize: 44, fontFace: "Helvetica", color: ACCENT_GREEN, bold: true,
     });
 
     // Contact details
@@ -302,15 +302,15 @@ export async function POST(request: Request) {
 // ── Helper: Slide header bar ───────────────────────────────
 
 function addSlideHeader(slide: PptxGenJS.Slide, title: string, practiceName: string) {
-  // Dark blue header bar
+  // Dark green header bar
   slide.addShape("rect" as unknown as PptxGenJS.ShapeType, {
     x: 0, y: 0, w: 13.33, h: 1.3,
-    fill: { color: BRAND_BLUE },
+    fill: { color: BRAND_GREEN },
   });
   // Gold accent line under header
   slide.addShape("rect" as unknown as PptxGenJS.ShapeType, {
     x: 0, y: 1.3, w: 13.33, h: 0.04,
-    fill: { color: ACCENT_GOLD },
+    fill: { color: ACCENT_GREEN },
   });
   slide.addText(title, {
     x: 0.8, y: 0.3, w: 9, h: 0.7,

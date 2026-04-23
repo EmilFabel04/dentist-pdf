@@ -16,7 +16,7 @@
 .sectionTitle {
   font-size: 1rem;
   font-weight: 600;
-  color: #0f62fe;
+  color: #579158;
   margin-bottom: 12px;
 }
 
@@ -45,7 +45,7 @@
 }
 
 .input:focus {
-  border-color: #0f62fe;
+  border-color: #579158;
   outline: none;
 }
 
@@ -83,7 +83,7 @@
 }
 
 .patientSearchInput:focus {
-  border-color: #0f62fe;
+  border-color: #579158;
   outline: none;
 }
 
@@ -114,15 +114,15 @@
 }
 
 .patientDropdownItem:hover {
-  background: #e8edff;
+  background: #e8f5e9;
 }
 
 .patientBadge {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: #e8edff;
-  color: #0f62fe;
+  background: #e8f5e9;
+  color: #579158;
   padding: 8px 14px;
   border-radius: 20px;
   font-weight: 600;
@@ -132,7 +132,7 @@
 .patientBadgeRemove {
   background: none;
   border: none;
-  color: #0f62fe;
+  color: #579158;
   cursor: pointer;
   font-size: 1.1rem;
   line-height: 1;
@@ -146,8 +146,8 @@
 .newPatientBtn {
   padding: 8px 14px;
   background: white;
-  color: #0f62fe;
-  border: 1px solid #0f62fe;
+  color: #579158;
+  border: 1px solid #579158;
   border-radius: 6px;
   font-weight: 600;
   cursor: pointer;
@@ -157,7 +157,7 @@
 }
 
 .newPatientBtn:hover {
-  background: #e8edff;
+  background: #e8f5e9;
 }
 
 .newPatientForm {
@@ -193,7 +193,7 @@
 }
 
 .treatmentSearch:focus {
-  border-color: #0f62fe;
+  border-color: #579158;
   outline: none;
 }
 
@@ -220,7 +220,7 @@
 }
 
 .treatmentResultItem:hover {
-  background: #e8edff;
+  background: #e8f5e9;
 }
 
 .treatmentResultItemDisabled {
@@ -245,8 +245,8 @@
 
 .category {
   padding: 2px 8px;
-  background: #e8edff;
-  color: #0f62fe;
+  background: #e8f5e9;
+  color: #579158;
   border-radius: 10px;
   font-size: 0.75rem;
   font-weight: 600;
@@ -338,7 +338,7 @@
 }
 
 .qtyInput:focus {
-  border-color: #0f62fe;
+  border-color: #579158;
   outline: none;
 }
 
@@ -377,7 +377,7 @@
 }
 
 .appointmentInput:focus {
-  border-color: #0f62fe;
+  border-color: #579158;
   outline: none;
 }
 
@@ -396,7 +396,7 @@
   font-size: 0.9rem;
   text-align: right;
   padding: 8px 12px;
-  background: #e8edff;
+  background: #e8f5e9;
   border-radius: 6px;
   margin-top: 8px;
 }
@@ -412,7 +412,7 @@
 
 .recordBtn {
   padding: 10px 20px;
-  background: #0f62fe;
+  background: #579158;
   color: white;
   border: none;
   border-radius: 6px;
@@ -423,7 +423,7 @@
 }
 
 .recordBtn:hover {
-  background: #0043ce;
+  background: #3d6b3e;
 }
 
 .recordBtn:disabled {
@@ -467,7 +467,7 @@
 
 .transcriptToggle {
   font-size: 0.85rem;
-  color: #0f62fe;
+  color: #579158;
   background: none;
   border: none;
   cursor: pointer;
@@ -502,8 +502,8 @@
 .refineBtn {
   padding: 8px 16px;
   background: #fff;
-  border: 1px solid #0f62fe;
-  color: #0f62fe;
+  border: 1px solid #579158;
+  color: #579158;
   border-radius: 6px;
   font-weight: 500;
   cursor: pointer;
@@ -511,7 +511,7 @@
 }
 
 .refineBtn:hover:not(:disabled) {
-  background: #e8edff;
+  background: #e8f5e9;
 }
 
 .refineBtn:disabled {
@@ -543,14 +543,14 @@
 }
 
 .refineTextarea:focus {
-  border-color: #0f62fe;
+  border-color: #579158;
 }
 
 /* ── Buttons ────────────────────────────────────────────────── */
 
 .primaryBtn {
   padding: 10px 24px;
-  background: #0f62fe;
+  background: #579158;
   color: white;
   border: none;
   border-radius: 6px;
@@ -561,7 +561,7 @@
 }
 
 .primaryBtn:hover {
-  background: #0043ce;
+  background: #3d6b3e;
 }
 
 .primaryBtn:disabled {
@@ -621,7 +621,7 @@
 }
 
 .successMsg a {
-  color: #0f62fe;
+  color: #579158;
   font-weight: 600;
   text-decoration: none;
 }

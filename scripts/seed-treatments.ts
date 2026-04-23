@@ -441,7 +441,7 @@ async function main() {
 
   console.log(`\nDone! Wrote ${written} treatment groups to Firestore.`);
   console.log(
-    `\nT&Cs applied to categories: ${[...new Set(tcEntries.map((t) => t.category))].join(", ")}`
+    `\nT&Cs applied to categories: ${[...new Set(tcEntries.flatMap((t) => t.categories))].join(", ")}`
   );
 }
 

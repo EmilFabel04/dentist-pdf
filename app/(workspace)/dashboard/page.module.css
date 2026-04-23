@@ -21,7 +21,7 @@
 .statValue {
   font-size: 2rem;
   font-weight: 700;
-  color: #0f62fe;
+  color: #579158;
   display: block;
 }
 
@@ -40,9 +40,9 @@
 .actionBtn {
   padding: 16px 32px;
   background: #fff;
-  border: 2px solid #0f62fe;
+  border: 2px solid #579158;
   border-radius: 10px;
-  color: #0f62fe;
+  color: #579158;
   font-weight: 600;
   font-size: 1rem;
   cursor: pointer;
@@ -50,6 +50,6 @@
 }
 
 .actionBtn:hover {
-  background: #0f62fe;
+  background: #579158;
   color: #fff;
 }

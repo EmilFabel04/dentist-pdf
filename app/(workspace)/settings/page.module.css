@@ -59,7 +59,7 @@
 }
 
 .input:focus {
-  border-color: #0f62fe;
+  border-color: #579158;
   outline: none;
 }
 
@@ -73,13 +73,13 @@
 }
 
 .textarea:focus {
-  border-color: #0f62fe;
+  border-color: #579158;
   outline: none;
 }
 
 .saveBtn {
   padding: 10px 24px;
-  background: #0f62fe;
+  background: #579158;
   color: white;
   border: none;
   border-radius: 6px;
@@ -89,5 +89,5 @@
 }
 
 .saveBtn:hover {
-  background: #0043ce;
+  background: #3d6b3e;
 }

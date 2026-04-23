@@ -27,19 +27,20 @@ type Body = {
 const GREEN: RGB = rgb(0.34, 0.57, 0.34);
 const DARK: RGB = rgb(0.1, 0.1, 0.1);
 const GRAY: RGB = rgb(0.4, 0.4, 0.4);
-const LIGHT_GRAY: RGB = rgb(0.85, 0.85, 0.85);
-const LIGHT_GREEN: RGB = rgb(0.91, 0.96, 0.91);
+const HEADER_BG: RGB = rgb(0.27, 0.27, 0.27); // dark gray for table headers
+const LIGHT_GRAY_BG: RGB = rgb(0.92, 0.92, 0.92);
+const YELLOW_HIGHLIGHT: RGB = rgb(1.0, 1.0, 0.6);
 const WHITE: RGB = rgb(1, 1, 1);
-const BLACK: RGB = rgb(0, 0, 0);
-const TABLE_BORDER: RGB = rgb(0.6, 0.6, 0.6);
+const TABLE_BORDER: RGB = rgb(0.7, 0.7, 0.7);
+const ALT_ROW_BG: RGB = rgb(0.97, 0.97, 0.97);
 
 // ── Page dimensions (A4) ────────────────────────────────────
 const PAGE_W = 595;
 const PAGE_H = 842;
-const MARGIN_L = 40;
-const MARGIN_R = 40;
-const CONTENT_W = PAGE_W - MARGIN_L - MARGIN_R;
-const MARGIN_BOTTOM = 40;
+const MARGIN_L = 50;
+const MARGIN_R = 50;
+const CONTENT_W = PAGE_W - MARGIN_L - MARGIN_R; // 495
+const MARGIN_BOTTOM = 50;
 
 // ── Drawing context ─────────────────────────────────────────
 type DrawCtx = {
@@ -50,7 +51,16 @@ type DrawCtx = {
   boldItalicFont: PDFFont;
   page: PDFPage;
   y: number;
+  settings: PracticeSettings;
 };
+
+// ── Utility: clean text for pdf-lib ─────────────────────────
+function cleanText(text: string): string {
+  return text
+    .replace(/[\r\n\t]/g, " ")
+    .replace(/[^\x20-\x7E]/g, "")
+    .trim();
+}
 
 // ── Main handler ────────────────────────────────────────────
 export async function POST(request: Request) {
@@ -72,7 +82,9 @@ export async function POST(request: Request) {
     const font = await doc.embedFont(StandardFonts.Helvetica);
     const boldFont = await doc.embedFont(StandardFonts.HelveticaBold);
     const italicFont = await doc.embedFont(StandardFonts.HelveticaOblique);
-    const boldItalicFont = await doc.embedFont(StandardFonts.HelveticaBoldOblique);
+    const boldItalicFont = await doc.embedFont(
+      StandardFonts.HelveticaBoldOblique
+    );
 
     const ctx: DrawCtx = {
       doc,
@@ -81,17 +93,16 @@ export async function POST(request: Request) {
       italicFont,
       boldItalicFont,
       page: doc.addPage([PAGE_W, PAGE_H]),
-      y: PAGE_H - 40,
+      y: 790,
+      settings,
     };
 
     // ================================================================
     // PAGE 1
     // ================================================================
-
     drawPage1(ctx, {
       patientName,
       date,
-      settings,
       selectedTreatments,
       appointmentCount,
       basicCodes,
@@ -101,22 +112,21 @@ export async function POST(request: Request) {
     // ================================================================
     // PAGE 2
     // ================================================================
-
     newPage(ctx);
     drawPage2(ctx, {
       patientName,
-      settings,
       selectedTreatments,
+      basicCodes,
+      appointmentCount,
+      discount,
     });
 
     // ================================================================
     // PAGE 3
     // ================================================================
-
     newPage(ctx);
     drawPage3(ctx, {
       patientName,
-      settings,
       selectedTreatments,
     });
 
@@ -148,7 +158,6 @@ function drawPage1(
   opts: {
     patientName: string;
     date: string;
-    settings: PracticeSettings;
     selectedTreatments: SelectedTreatment[];
     appointmentCount: number;
     basicCodes: BasicCodeItem[];
@@ -158,63 +167,20 @@ function drawPage1(
   const {
     patientName,
     date,
-    settings,
     selectedTreatments,
     appointmentCount,
     basicCodes,
     discount,
   } = opts;
-  const { font, boldFont, italicFont } = ctx;
+  const { font, boldFont, italicFont, boldItalicFont, settings } = ctx;
 
-  // ── Logo space (skip for now) ──
-  ctx.y -= 10;
+  // ── 1. Practice header (centered) ──
+  drawPracticeHeader(ctx);
+  ctx.y -= 25;
 
-  // ── Practice header (centered) ──
-  drawCenteredText(ctx, settings.name || "Dr Sheryl Smithies BChD (PRET)", {
-    size: 12,
-    font: boldFont,
-    color: GREEN,
-  });
-  ctx.y -= 2;
-
-  if (settings.phone) {
-    drawCenteredText(ctx, `T: ${settings.phone}`, {
-      size: 8,
-      font,
-      color: GRAY,
-    });
-  }
-
-  const practiceInfoParts: string[] = [];
-  if (settings.vatNumber) practiceInfoParts.push(`Practice Number: ${settings.vatNumber}`);
-  if (practiceInfoParts.length > 0) {
-    drawCenteredText(ctx, practiceInfoParts.join(". "), {
-      size: 8,
-      font,
-      color: GRAY,
-    });
-  }
-
-  if (settings.phone) {
-    drawCenteredText(ctx, `t: ${settings.phone}`, {
-      size: 8,
-      font,
-      color: GRAY,
-    });
-  }
-
-  if (settings.email) {
-    drawCenteredText(ctx, `e: ${settings.email}`, {
-      size: 8,
-      font,
-      color: GRAY,
-    });
-  }
-
-  ctx.y -= 12;
-
-  // ── Patient greeting: Dear / Date ──
-  ctx.page.drawText(`Dear ${patientName}`, {
+  // ── 2. Patient greeting: Dear / Date ──
+  const cleanPatient = cleanText(patientName);
+  ctx.page.drawText(`Dear ${cleanPatient}`, {
     x: MARGIN_L,
     y: ctx.y,
     size: 10,
@@ -222,7 +188,7 @@ function drawPage1(
     color: DARK,
   });
 
-  const dateStr = `Date: ${date}`;
+  const dateStr = cleanText(`Date: ${date}`);
   const dateW = font.widthOfTextAtSize(dateStr, 10);
   ctx.page.drawText(dateStr, {
     x: PAGE_W - MARGIN_R - dateW,
@@ -231,74 +197,60 @@ function drawPage1(
     font,
     color: DARK,
   });
-  ctx.y -= 18;
+  ctx.y -= 20;
 
-  // ── Intro paragraphs ──
+  // ── 3. Intro paragraph ──
   const introText =
     "I hope this letter finds you well. Following your recent appointment and review of the available information, my advice for treatment is as per the following estimate. This estimate details the necessary appointments and sequence of treatment.";
-  drawWrappedText(ctx, introText, { size: 8, font, color: DARK });
-  ctx.y -= 8;
+  drawWrappedText(ctx, introText, { size: 9, font, color: DARK });
+  ctx.y -= 15;
 
+  // ── 4. NB note ──
   const nbText = `NB: This estimate is valid for ${settings.quoteValidityDays || 6} months. Fees increase at the beginning of each calendar year, therefore, fees will be adjusted accordingly should your treatment plan extend into a new year. 3rd party provider fees are subject to change depending on the provider.`;
-  drawWrappedText(ctx, nbText, { size: 7, font: italicFont, color: GRAY });
-  ctx.y -= 12;
+  drawWrappedText(ctx, nbText, { size: 8, font: boldItalicFont, color: DARK });
+  ctx.y -= 20;
 
-  // ── "Proposed Treatment Plan:" heading ──
-  ctx.page.drawText("Proposed Treatment Plan:", {
-    x: MARGIN_L,
-    y: ctx.y,
-    size: 11,
-    font: boldFont,
-    color: GREEN,
-  });
-  ctx.y -= 16;
+  // ── 5. "Proposed Treatment Plan:" heading ──
+  drawSectionHeading(ctx, "Proposed Treatment Plan:");
+  ctx.y -= 15;
 
-  // ── Appointment Breakdown table ──
-  const apptTableColWidths = [40, 320, 155];
-  const apptTableX = MARGIN_L;
-  const apptTableW = CONTENT_W;
-  const apptRowH = 16;
+  // ── 6. Appointment Breakdown table ──
+  drawSubHeading(ctx, "Appointment Breakdown:");
+  ctx.y -= 10;
 
-  // Header row
-  drawTableHeaderRow(ctx, apptTableX, apptTableW, apptRowH, [
-    { text: "", width: apptTableColWidths[0] },
-    { text: "Treatments", width: apptTableColWidths[1] },
-    { text: "Appointment Length", width: apptTableColWidths[2] },
-  ]);
+  const apptColWidths = [120, 225, 150];
+  const apptHeaders = ["", "Treatments", "Appointment Length"];
+  const apptRowH = 18;
 
-  // Data rows — dynamic based on actual appointment count
+  drawTableHeader(ctx, MARGIN_L, CONTENT_W, apptRowH, apptHeaders, apptColWidths);
+
   for (let i = 0; i < appointmentCount; i++) {
     ensureSpace(ctx, apptRowH);
-    const cellData = [
-      { text: `Appointment ${i + 1}`, width: apptTableColWidths[0] + apptTableColWidths[1] },
-      { text: "", width: apptTableColWidths[2] },
-    ];
-
-    // Draw row borders
     const rowY = ctx.y;
+
+    // Row background
     ctx.page.drawRectangle({
-      x: apptTableX,
+      x: MARGIN_L,
       y: rowY - apptRowH + 4,
-      width: apptTableW,
+      width: CONTENT_W,
       height: apptRowH,
+      color: WHITE,
       borderColor: TABLE_BORDER,
       borderWidth: 0.5,
-      color: WHITE,
     });
 
     // Vertical dividers
-    let divX = apptTableX;
-    for (const cw of apptTableColWidths) {
-      divX += cw;
-      if (divX < apptTableX + apptTableW) {
-        drawVLine(ctx.page, divX, rowY + 4, apptRowH);
-      }
+    let divX = MARGIN_L;
+    for (let c = 0; c < apptColWidths.length - 1; c++) {
+      divX += apptColWidths[c];
+      drawVLine(ctx.page, divX, rowY + 4, apptRowH);
     }
 
     // Text
-    ctx.page.drawText(`Appointment ${i + 1}`, {
-      x: apptTableX + 4,
-      y: rowY - 8,
+    const cellText = cleanText(`Appointment ${i + 1}`);
+    ctx.page.drawText(cellText, {
+      x: MARGIN_L + 6,
+      y: rowY - 11,
       size: 8,
       font,
       color: DARK,
@@ -307,21 +259,18 @@ function drawPage1(
     ctx.y -= apptRowH;
   }
 
-  ctx.y -= 10;
+  ctx.y -= 20;
 
-  // ── Cost intro ──
+  // ── 7. Cost intro text ──
   ensureSpace(ctx, 16);
   drawWrappedText(
     ctx,
     "The expected costs of the proposed dental treatment are as follows:",
     { size: 9, font, color: DARK }
   );
-  ctx.y -= 6;
+  ctx.y -= 10;
 
-  // ── Grand Total line ──
-  ensureSpace(ctx, 20);
-
-  // Compute grand total
+  // ── Compute totals ──
   let grandTotal = 0;
   for (let apt = 0; apt < appointmentCount; apt++) {
     for (const bc of basicCodes) {
@@ -334,102 +283,104 @@ function drawPage1(
     }
   }
 
-  // Third party fees total
   let thirdPartyTotal = 0;
   for (const st of selectedTreatments) {
     for (const sc of st.selectedCodes) {
       const matchingCode = st.treatment.codes.find((c) => c.code === sc.code);
       if (matchingCode) {
-        thirdPartyTotal += ((matchingCode.labFee || 0) + (matchingCode.implantFee || 0)) * sc.quantity;
+        thirdPartyTotal +=
+          ((matchingCode.labFee || 0) + (matchingCode.implantFee || 0)) *
+          sc.quantity;
       }
     }
   }
 
   const grandTotalWithLab = grandTotal + thirdPartyTotal;
 
-  ctx.page.drawRectangle({
-    x: MARGIN_L,
-    y: ctx.y - 6,
-    width: CONTENT_W,
-    height: 18,
-    color: LIGHT_GREEN,
-  });
+  // ── 8. Grand Total preview line ──
+  ensureSpace(ctx, 30);
+  drawHLine(ctx.page, MARGIN_L, ctx.y + 2, CONTENT_W, TABLE_BORDER);
 
-  ctx.page.drawText("Grand Total For This Estimate (including lab fee approximation)", {
-    x: MARGIN_L + 4,
-    y: ctx.y,
-    size: 8,
-    font: boldFont,
-    color: DARK,
-  });
+  ctx.page.drawText(
+    cleanText(
+      "Grand Total For This Estimate (including lab fee approximation)"
+    ),
+    {
+      x: MARGIN_L + 6,
+      y: ctx.y - 10,
+      size: 9,
+      font: boldFont,
+      color: DARK,
+    }
+  );
 
   const grandTotalStr = fmtR(grandTotalWithLab);
-  const grandTotalW = boldFont.widthOfTextAtSize(grandTotalStr, 10);
+  const grandTotalW = boldFont.widthOfTextAtSize(grandTotalStr, 12);
   ctx.page.drawText(grandTotalStr, {
-    x: PAGE_W - MARGIN_R - grandTotalW - 4,
-    y: ctx.y,
-    size: 10,
+    x: PAGE_W - MARGIN_R - grandTotalW - 6,
+    y: ctx.y - 11,
+    size: 12,
     font: boldFont,
     color: GREEN,
   });
-  ctx.y -= 20;
 
-  // ── Treatment line items table ──
-  // Columns: Item Code | Description | ICD-10 Codes | Provider | Tooth Numbers | Per Unit Price | Units | Total
-  const treatColWidths = [50, 120, 55, 50, 50, 60, 35, 95];
+  drawHLine(ctx.page, MARGIN_L, ctx.y - 18, CONTENT_W, TABLE_BORDER);
+  ctx.y -= 25;
+
+  // ── 9. Treatment line items table ──
+  const treatColWidths = [45, 130, 55, 50, 50, 55, 35, 75];
   const treatHeaders = [
     "Item Code",
     "Description",
-    "ICD-10 Codes",
+    "ICD-10",
     "Provider",
-    "Tooth Numbers",
-    "Per Unit Price",
+    "Tooth Nums",
+    "Per Unit",
     "Units",
     "Total",
   ];
-  const tableX = MARGIN_L;
 
-  // Table header
-  drawTableHeaderRow(ctx, tableX, CONTENT_W, 16, treatHeaders.map((h, i) => ({
-    text: h,
-    width: treatColWidths[i],
-  })));
+  drawTableHeader(
+    ctx,
+    MARGIN_L,
+    CONTENT_W,
+    16,
+    treatHeaders,
+    treatColWidths,
+    true
+  );
 
-  // Compute cumulative X positions for columns
-  const treatColX: number[] = [];
-  let cx = tableX;
-  for (const w of treatColWidths) {
-    treatColX.push(cx);
-    cx += w;
-  }
-
-  const rowH = 13;
+  const treatColX = computeColX(MARGIN_L, treatColWidths);
+  const rowH = 16;
+  let rowIndex = 0;
 
   // Basic codes per appointment
   for (let apt = 0; apt < appointmentCount; apt++) {
-    // Appointment sub-header
+    // Appointment sub-header row
     ensureSpace(ctx, rowH);
+    const subY = ctx.y;
     ctx.page.drawRectangle({
-      x: tableX,
-      y: ctx.y - rowH + 4,
+      x: MARGIN_L,
+      y: subY - rowH + 4,
       width: CONTENT_W,
       height: rowH,
-      color: LIGHT_GREEN,
+      color: LIGHT_GRAY_BG,
     });
-    drawHLine(ctx.page, tableX, ctx.y + 4, CONTENT_W, TABLE_BORDER);
-    ctx.page.drawText(`Appointment ${apt + 1}`, {
-      x: tableX + 4,
-      y: ctx.y - 6,
-      size: 7,
+    drawHLine(ctx.page, MARGIN_L, subY + 4, CONTENT_W, TABLE_BORDER);
+    ctx.page.drawText(cleanText(`Appointment ${apt + 1}`), {
+      x: MARGIN_L + 6,
+      y: subY - 10,
+      size: 8,
       font: boldFont,
       color: GREEN,
     });
     ctx.y -= rowH;
+    rowIndex++;
 
     for (const bc of basicCodes) {
       ensureSpace(ctx, rowH);
       const lineTotal = bc.price * bc.quantity;
-      drawTreatmentRow(ctx, treatColX, treatColWidths, rowH, {
+      drawTreatmentRow(ctx, treatColX, treatColWidths, rowH, rowIndex, {
         code: bc.code,
         desc: bc.description,
         icd10: "",
@@ -439,6 +390,7 @@ function drawPage1(
         units: String(bc.quantity),
         total: fmtR(lineTotal),
       });
+      rowIndex++;
     }
   }
 
@@ -448,9 +400,9 @@ function drawPage1(
       ensureSpace(ctx, rowH);
       const lineTotal = sc.price * sc.quantity;
       const matchingCode = st.treatment.codes.find((c) => c.code === sc.code);
-      drawTreatmentRow(ctx, treatColX, treatColWidths, rowH, {
+      drawTreatmentRow(ctx, treatColX, treatColWidths, rowH, rowIndex, {
         code: sc.code,
-        desc: truncate(sc.description, 28),
+        desc: sc.description,
         icd10: matchingCode?.icd10 || "",
         provider: "",
         toothNumbers: "",
@@ -458,71 +410,101 @@ function drawPage1(
         units: String(sc.quantity),
         total: fmtR(lineTotal),
       });
+      rowIndex++;
     }
   }
 
-  // Bottom line of table
-  drawHLine(ctx.page, tableX, ctx.y + 4, CONTENT_W, TABLE_BORDER);
-  ctx.y -= 4;
+  // Close bottom of table
+  drawHLine(ctx.page, MARGIN_L, ctx.y + 4, CONTENT_W, TABLE_BORDER);
+  ctx.y -= 6;
 
-  // ── Discount rows ──
+  // ── 10. Discount rows (yellow highlight) ──
   const discountRows = [
-    { label: "DISCOUNT 5%", pct: 0.05 },
-    { label: "DISCOUNT 10%", pct: 0.1 },
-    { label: "DISCOUNT 15%", pct: 0.15 },
+    { label: "DISCOUNT 5% VALID 30 DAYS", pct: 0.05 },
+    { label: "DISCOUNT 10% VALID FOR 30 DAYS", pct: 0.1 },
+    { label: "DISCOUNT 15% VALID FOR 30 DAYS", pct: 0.15 },
   ];
 
   for (const dr of discountRows) {
-    ensureSpace(ctx, 12);
+    ensureSpace(ctx, 16);
+    const drY = ctx.y;
     const discountAmt = grandTotal * dr.pct;
     const afterDiscount = grandTotal - discountAmt;
 
-    ctx.page.drawText(dr.label, {
-      x: MARGIN_L + 4,
-      y: ctx.y,
-      size: 7,
-      font: italicFont,
-      color: GREEN,
+    // Yellow background across full row
+    ctx.page.drawRectangle({
+      x: MARGIN_L,
+      y: drY - 12,
+      width: CONTENT_W,
+      height: 16,
+      color: YELLOW_HIGHLIGHT,
     });
 
-    const dStr = fmtR(afterDiscount);
-    const dW = font.widthOfTextAtSize(dStr, 7);
-    ctx.page.drawText(dStr, {
-      x: PAGE_W - MARGIN_R - dW - 4,
-      y: ctx.y,
-      size: 7,
+    ctx.page.drawText(cleanText(dr.label), {
+      x: MARGIN_L + 6,
+      y: drY - 8,
+      size: 8,
       font,
       color: DARK,
     });
-    ctx.y -= 12;
+
+    const dStr = fmtR(afterDiscount);
+    const dW = font.widthOfTextAtSize(dStr, 8);
+    ctx.page.drawText(dStr, {
+      x: PAGE_W - MARGIN_R - dW - 6,
+      y: drY - 8,
+      size: 8,
+      font,
+      color: DARK,
+    });
+    ctx.y -= 16;
   }
 
-  ctx.y -= 2;
+  ctx.y -= 4;
+
+  // ── 11. Discount note ──
   ensureSpace(ctx, 12);
   ctx.page.drawText(
-    "Discounts above are only valid for deposit/full payment within 30 days",
-    { x: MARGIN_L + 4, y: ctx.y, size: 6, font: italicFont, color: GRAY }
+    cleanText(
+      "Discounts above are only valid for deposit/full payment within 30 days."
+    ),
+    {
+      x: MARGIN_L + 6,
+      y: ctx.y,
+      size: 7,
+      font: italicFont,
+      color: GRAY,
+    }
   );
   ctx.y -= 14;
 
-  // ── TOTAL line ──
-  ensureSpace(ctx, 18);
-  drawHLine(ctx.page, MARGIN_L, ctx.y + 6, CONTENT_W, TABLE_BORDER);
+  // ── 12. TOTAL line ──
+  ensureSpace(ctx, 24);
+  drawHLine(ctx.page, MARGIN_L, ctx.y + 4, CONTENT_W, TABLE_BORDER);
+  drawHLine(ctx.page, MARGIN_L, ctx.y + 6, CONTENT_W, TABLE_BORDER); // double line
+
   ctx.page.drawText(
-    "TOTAL (incl discount for our fees, excl 3rd party fees):",
-    { x: MARGIN_L + 4, y: ctx.y, size: 8, font: boldFont, color: DARK }
+    cleanText("TOTAL (incl discount for our fees, excl 3rd party fees):"),
+    {
+      x: MARGIN_L + 6,
+      y: ctx.y - 8,
+      size: 10,
+      font: boldFont,
+      color: DARK,
+    }
   );
+
   const totalAfterDiscount = discount ? grandTotal - discount : grandTotal;
   const totalStr = fmtR(totalAfterDiscount);
   const totalW = boldFont.widthOfTextAtSize(totalStr, 10);
   ctx.page.drawText(totalStr, {
-    x: PAGE_W - MARGIN_R - totalW - 4,
-    y: ctx.y - 1,
+    x: PAGE_W - MARGIN_R - totalW - 6,
+    y: ctx.y - 8,
     size: 10,
     font: boldFont,
     color: GREEN,
   });
-  ctx.y -= 12;
+  ctx.y -= 16;
 }
 
 // ================================================================
@@ -533,64 +515,66 @@ function drawPage2(
   ctx: DrawCtx,
   opts: {
     patientName: string;
-    settings: PracticeSettings;
     selectedTreatments: SelectedTreatment[];
+    basicCodes: BasicCodeItem[];
+    appointmentCount: number;
+    discount?: number;
   }
 ) {
-  const { patientName, settings, selectedTreatments } = opts;
-  const { font, boldFont, italicFont } = ctx;
+  const { patientName, selectedTreatments, basicCodes, appointmentCount, discount } =
+    opts;
+  const { font, boldFont, italicFont, settings } = ctx;
 
-  // ── Third Party Fees section ──
-  ctx.page.drawText("Third Party Fees", {
-    x: MARGIN_L,
-    y: ctx.y,
-    size: 10,
-    font: boldFont,
-    color: GREEN,
-  });
-  ctx.y -= 16;
+  // Small practice header on continuation pages
+  drawSmallHeader(ctx);
+  ctx.y -= 15;
 
-  const treatColWidths = [50, 120, 55, 50, 50, 60, 35, 95];
+  // ── 13. Third Party Fees section ──
+  drawSectionHeading(ctx, "Third Party Fees");
+  ctx.y -= 10;
+
+  const treatColWidths = [45, 130, 55, 50, 50, 55, 35, 75];
   const treatHeaders = [
     "Item Code",
     "Description",
-    "ICD-10 Codes",
+    "ICD-10",
     "Provider",
-    "Tooth Numbers",
-    "Per Unit Price",
+    "Tooth Nums",
+    "Per Unit",
     "Units",
     "Total",
   ];
-  const tableX = MARGIN_L;
 
-  // Table header
-  drawTableHeaderRow(ctx, tableX, CONTENT_W, 16, treatHeaders.map((h, i) => ({
-    text: h,
-    width: treatColWidths[i],
-  })));
+  drawTableHeader(
+    ctx,
+    MARGIN_L,
+    CONTENT_W,
+    16,
+    treatHeaders,
+    treatColWidths,
+    true
+  );
 
-  const treatColX: number[] = [];
-  let cx = tableX;
-  for (const w of treatColWidths) {
-    treatColX.push(cx);
-    cx += w;
-  }
-
-  const rowH = 13;
+  const treatColX = computeColX(MARGIN_L, treatColWidths);
+  const rowH = 16;
   let thirdPartyTotal = 0;
+  let rowIndex = 0;
 
-  // Third party items (lab fees, implant fees)
   for (const st of selectedTreatments) {
     for (const sc of st.selectedCodes) {
       const matchingCode = st.treatment.codes.find((c) => c.code === sc.code);
-      if (matchingCode && ((matchingCode.labFee && matchingCode.labFee > 0) || (matchingCode.implantFee && matchingCode.implantFee > 0))) {
+      if (
+        matchingCode &&
+        ((matchingCode.labFee && matchingCode.labFee > 0) ||
+          (matchingCode.implantFee && matchingCode.implantFee > 0))
+      ) {
         if (matchingCode.labFee && matchingCode.labFee > 0) {
           ensureSpace(ctx, rowH);
           const lineTotal = matchingCode.labFee * sc.quantity;
           thirdPartyTotal += lineTotal;
-          drawTreatmentRow(ctx, treatColX, treatColWidths, rowH, {
+          drawTreatmentRow(ctx, treatColX, treatColWidths, rowH, rowIndex, {
             code: sc.code,
-            desc: `Lab fee - ${truncate(sc.description, 18)}`,
+            desc: `Lab fee - ${sc.description}`,
             icd10: "",
             provider: "Lab",
             toothNumbers: "",
@@ -598,14 +582,15 @@ function drawPage2(
             units: String(sc.quantity),
             total: fmtR(lineTotal),
           });
+          rowIndex++;
         }
         if (matchingCode.implantFee && matchingCode.implantFee > 0) {
           ensureSpace(ctx, rowH);
           const lineTotal = matchingCode.implantFee * sc.quantity;
           thirdPartyTotal += lineTotal;
-          drawTreatmentRow(ctx, treatColX, treatColWidths, rowH, {
+          drawTreatmentRow(ctx, treatColX, treatColWidths, rowH, rowIndex, {
             code: sc.code,
-            desc: `Implant - ${truncate(sc.description, 18)}`,
+            desc: `Implant - ${sc.description}`,
             icd10: "",
             provider: "Supplier",
             toothNumbers: "",
@@ -613,19 +598,20 @@ function drawPage2(
             units: String(sc.quantity),
             total: fmtR(lineTotal),
           });
+          rowIndex++;
         }
       }
     }
   }
 
   // Bottom line
-  drawHLine(ctx.page, tableX, ctx.y + 4, CONTENT_W, TABLE_BORDER);
+  drawHLine(ctx.page, MARGIN_L, ctx.y + 4, CONTENT_W, TABLE_BORDER);
   ctx.y -= 4;
 
-  // TOTAL row
-  ensureSpace(ctx, 14);
-  ctx.page.drawText("TOTAL", {
-    x: MARGIN_L + 4,
+  // TOTAL row for third party
+  ensureSpace(ctx, 18);
+  ctx.page.drawText(cleanText("TOTAL"), {
+    x: MARGIN_L + 6,
     y: ctx.y,
     size: 8,
     font: boldFont,
@@ -634,122 +620,118 @@ function drawPage2(
   const tpTotalStr = fmtR(thirdPartyTotal);
   const tpTotalW = boldFont.widthOfTextAtSize(tpTotalStr, 8);
   ctx.page.drawText(tpTotalStr, {
-    x: PAGE_W - MARGIN_R - tpTotalW - 4,
+    x: PAGE_W - MARGIN_R - tpTotalW - 6,
     y: ctx.y,
     size: 8,
     font: boldFont,
     color: DARK,
   });
-  ctx.y -= 14;
+  ctx.y -= 18;
 
-  // Total including lab fee approximation
-  ensureSpace(ctx, 14);
-  ctx.page.drawText("Total (including lab fee approximation)", {
-    x: MARGIN_L + 4,
-    y: ctx.y,
-    size: 8,
-    font: boldFont,
-    color: DARK,
-  });
-  const inclLabStr = fmtR(thirdPartyTotal);
-  const inclLabW = boldFont.widthOfTextAtSize(inclLabStr, 8);
+  // ── 14. Total (including lab fee approximation) ──
+  ensureSpace(ctx, 18);
+
+  // Recompute grand total
+  let grandTotal = 0;
+  for (let apt = 0; apt < appointmentCount; apt++) {
+    for (const bc of basicCodes) {
+      grandTotal += bc.price * bc.quantity;
+    }
+  }
+  for (const st of selectedTreatments) {
+    for (const sc of st.selectedCodes) {
+      grandTotal += sc.price * sc.quantity;
+    }
+  }
+  const totalAfterDiscount = discount ? grandTotal - discount : grandTotal;
+  const grandTotalWithLab = totalAfterDiscount + thirdPartyTotal;
+
+  ctx.page.drawText(
+    cleanText("Total (including lab fee approximation)"),
+    {
+      x: MARGIN_L + 6,
+      y: ctx.y,
+      size: 9,
+      font: boldFont,
+      color: DARK,
+    }
+  );
+  const inclLabStr = fmtR(grandTotalWithLab);
+  const inclLabW = boldFont.widthOfTextAtSize(inclLabStr, 10);
   ctx.page.drawText(inclLabStr, {
-    x: PAGE_W - MARGIN_R - inclLabW - 4,
-    y: ctx.y,
-    size: 8,
-    font: boldFont,
-    color: GREEN,
-  });
-  ctx.y -= 20;
-
-  // ── Tooth diagram area ──
-  drawToothDiagramLabels(ctx);
-  ctx.y -= 14;
-
-  // ── Consent section ──
-  ensureSpace(ctx, 20);
-  ctx.page.drawText("Consent", {
-    x: MARGIN_L,
+    x: PAGE_W - MARGIN_R - inclLabW - 6,
     y: ctx.y,
     size: 10,
     font: boldFont,
     color: GREEN,
   });
-  ctx.y -= 14;
+  ctx.y -= 25;
+
+  // ── 15. Tooth Diagram labels ──
+  drawToothDiagramLabels(ctx);
+  ctx.y -= 20;
+
+  // ── 16. Consent section ──
+  ensureSpace(ctx, 20);
+  drawSectionHeading(ctx, "Consent");
+  ctx.y -= 10;
 
   drawWrappedText(
     ctx,
     "Kindly Read the Terms and Conditions below, sign and send back to us.",
-    { size: 7, font: italicFont, color: GRAY }
+    { size: 8, font: italicFont, color: GRAY }
   );
-  ctx.y -= 6;
+  ctx.y -= 8;
 
+  const consentName = cleanText(settings.name || "Dr Smithies");
   drawWrappedText(
     ctx,
-    `I, _______________ hereby accept this estimate from ${settings.name || "Dr Smithies"} ("the dentist") in the amount of R_______________ ("the quoted amount"). I accept this treatment on the conditions as set out below:`,
+    `I, _______________ hereby accept this estimate from ${consentName} ("the dentist") in the amount of R_______________ ("the quoted amount"). I accept this treatment on the conditions as set out below:`,
     { size: 8, font, color: DARK }
   );
-  ctx.y -= 4;
+  ctx.y -= 6;
 
   drawWrappedText(
     ctx,
     "I acknowledge that the dentist may be required to do additional work, alter or adjust treatment during the course of the planned treatment and I hereby consent to these changes in advance. I understand that the quoted fees may differ depending on the changes made.",
     { size: 8, font, color: DARK }
   );
-  ctx.y -= 10;
+  ctx.y -= 15;
 
-  // ── Payment Options ──
+  // ── 17. Payment Options ──
   ensureSpace(ctx, 20);
-  ctx.page.drawText("Payment Options", {
-    x: MARGIN_L,
-    y: ctx.y,
-    size: 10,
-    font: boldFont,
-    color: GREEN,
-  });
-  ctx.y -= 14;
+  drawSectionHeading(ctx, "Payment Options");
+  ctx.y -= 10;
 
   drawWrappedText(
     ctx,
     "Payment Option 1 = full payment on acceptance of estimate. 5% discount on our fees (not applicable to 3rd party fees).",
     { size: 8, font, color: DARK }
   );
-  ctx.y -= 4;
+  ctx.y -= 6;
   drawWrappedText(
     ctx,
     "Payment Option 2 = pay 50% deposit on acceptance of estimate and the balance before the last appointment.",
     { size: 8, font, color: DARK }
   );
-  ctx.y -= 10;
+  ctx.y -= 15;
 
-  // ── Domicilium Citandi Et Executandi ──
-  ensureSpace(ctx, 16);
-  ctx.page.drawText("Domicilium Citandi Et Executandi", {
-    x: MARGIN_L,
-    y: ctx.y,
-    size: 9,
-    font: boldFont,
-    color: GREEN,
-  });
-  ctx.y -= 12;
+  // ── 18. Domicilium ──
+  ensureSpace(ctx, 20);
+  drawSectionHeading(ctx, "Domicilium Citandi Et Executandi");
+  ctx.y -= 10;
 
   drawWrappedText(
     ctx,
     "The patient chooses the address given above as the address at which all legal documents may be served on the patient (domicilium citandi et executandi).",
-    { size: 7, font, color: DARK }
+    { size: 7.5, font, color: DARK }
   );
-  ctx.y -= 8;
+  ctx.y -= 15;
 
-  // ── General T&Cs ──
-  ensureSpace(ctx, 16);
-  ctx.page.drawText("General Terms and Conditions", {
-    x: MARGIN_L,
-    y: ctx.y,
-    size: 9,
-    font: boldFont,
-    color: GREEN,
-  });
-  ctx.y -= 12;
+  // ── 19. General Terms and Conditions ──
+  ensureSpace(ctx, 20);
+  drawSectionHeading(ctx, "General Terms and Conditions");
+  ctx.y -= 10;
 
   const generalTCs = [
     "No alteration, cancellation or variation of this document shall be of any force or effect unless reduced to writing and signed by both parties.",
@@ -761,40 +743,28 @@ function drawPage2(
   ];
 
   for (const tc of generalTCs) {
-    ensureSpace(ctx, 12);
-    drawWrappedText(ctx, `\u2022 ${tc}`, { size: 6.5, font, color: DARK });
-    ctx.y -= 3;
+    ensureSpace(ctx, 14);
+    drawWrappedText(ctx, `- ${tc}`, { size: 7.5, font, color: DARK });
+    ctx.y -= 4;
   }
-  ctx.y -= 6;
+  ctx.y -= 10;
 
-  // ── Cancellations ──
-  ensureSpace(ctx, 16);
-  ctx.page.drawText("Cancellations", {
-    x: MARGIN_L,
-    y: ctx.y,
-    size: 9,
-    font: boldFont,
-    color: GREEN,
-  });
-  ctx.y -= 12;
+  // ── 20. Cancellations ──
+  ensureSpace(ctx, 20);
+  drawSectionHeading(ctx, "Cancellations");
+  ctx.y -= 10;
 
   drawWrappedText(
     ctx,
     "Appointments that are cancelled with less than 24 hours notice will be charged a cancellation fee at the discretion of the practice.",
-    { size: 7, font, color: DARK }
+    { size: 7.5, font, color: DARK }
   );
-  ctx.y -= 8;
+  ctx.y -= 15;
 
-  // ── Information about your treatment ──
-  ensureSpace(ctx, 16);
-  ctx.page.drawText("Information about your treatment:", {
-    x: MARGIN_L,
-    y: ctx.y,
-    size: 9,
-    font: boldFont,
-    color: GREEN,
-  });
-  ctx.y -= 12;
+  // ── 21. Information about your treatment ──
+  ensureSpace(ctx, 20);
+  drawSectionHeading(ctx, "Information about your treatment:");
+  ctx.y -= 10;
 
   const infoItems = [
     "Dental checkups: Regular dental checkups are recommended every 6 months to ensure early detection and treatment of any dental issues.",
@@ -806,13 +776,13 @@ function drawPage2(
   ];
 
   for (let i = 0; i < infoItems.length; i++) {
-    ensureSpace(ctx, 12);
+    ensureSpace(ctx, 14);
     drawWrappedText(ctx, `${i + 1}. ${infoItems[i]}`, {
-      size: 6.5,
+      size: 7.5,
       font,
       color: DARK,
     });
-    ctx.y -= 3;
+    ctx.y -= 4;
   }
 }
 
@@ -824,126 +794,120 @@ function drawPage3(
   ctx: DrawCtx,
   opts: {
     patientName: string;
-    settings: PracticeSettings;
     selectedTreatments: SelectedTreatment[];
   }
 ) {
-  const { patientName, settings, selectedTreatments } = opts;
-  const { font, boldFont, italicFont } = ctx;
+  const { patientName, selectedTreatments } = opts;
+  const { font, boldFont, italicFont, settings } = ctx;
 
-  // ── Practice header ──
-  drawCenteredText(ctx, settings.name || "Dr Sheryl Smithies BChD (PRET)", {
-    size: 12,
-    font: boldFont,
-    color: GREEN,
-  });
-  ctx.y -= 8;
+  // Small practice header
+  drawSmallHeader(ctx);
+  ctx.y -= 15;
 
-  // ── Treatment Type / What to Expect table ──
-  ctx.page.drawText("Treatment Type / What to Expect and Aftercare", {
-    x: MARGIN_L,
-    y: ctx.y,
-    size: 10,
-    font: boldFont,
-    color: GREEN,
-  });
-  ctx.y -= 14;
+  // ── 22. Treatment Type / What to Expect table ──
+  drawSectionHeading(ctx, "Treatment Type / What to Expect and Aftercare");
+  ctx.y -= 10;
 
-  const treatTypeColWidths = [100, 340, 75];
+  const ttColWidths = [100, 340, 55];
   const ttHeaders = ["Treatment Type", "What to Expect and Aftercare", "Initial"];
-  const ttTableX = MARGIN_L;
 
-  // Header
-  drawTableHeaderRow(ctx, ttTableX, CONTENT_W, 16, ttHeaders.map((h, i) => ({
-    text: h,
-    width: treatTypeColWidths[i],
-  })));
+  drawTableHeader(ctx, MARGIN_L, CONTENT_W, 16, ttHeaders, ttColWidths, true);
 
   // PPE row (always present)
-  const ppeRowH = 30;
-  ensureSpace(ctx, ppeRowH);
-  drawTreatmentTypeRow(ctx, ttTableX, treatTypeColWidths, ppeRowH, {
+  const ppeDesc =
+    "Standard infection control and PPE protocols are followed for all treatments to ensure your safety.";
+  drawTreatmentTypeRow(ctx, MARGIN_L, ttColWidths, {
     type: "PPE and Infection Control",
-    description: "Standard infection control and PPE protocols are followed for all treatments to ensure your safety.",
+    description: ppeDesc,
   });
 
-  // Dynamic rows from selected treatments — use treatment name, deduplicate by T&C content
+  // Dynamic rows from selected treatments
   const treatmentTCs = new Map<string, string>();
   for (const st of selectedTreatments) {
     if (st.treatment.termsAndConditions) {
-      // Use the treatment name as display, skip if we already have this exact T&C
-      const tcText = st.treatment.termsAndConditions.replace(/---/g, "").trim();
+      const tcText = cleanText(
+        st.treatment.termsAndConditions.replace(/---/g, "").trim()
+      );
       const existingValues = [...treatmentTCs.values()];
-      if (!existingValues.some(v => v === tcText)) {
-        const displayName = formatCategoryName(st.treatment.category || st.treatment.name);
+      if (!existingValues.some((v) => v === tcText)) {
+        const displayName = formatCategoryName(
+          st.treatment.category || st.treatment.name
+        );
         treatmentTCs.set(displayName, tcText);
       }
     }
   }
 
   for (const [category, tc] of treatmentTCs) {
-    // Calculate row height based on text length
-    const maxDescWidth = treatTypeColWidths[1] - 8;
-    const descLines = wrapTextToLines(tc, maxDescWidth, font, 6.5);
-    const dynamicRowH = Math.max(30, descLines.length * 9 + 10);
-
-    ensureSpace(ctx, dynamicRowH);
-    drawTreatmentTypeRow(ctx, ttTableX, treatTypeColWidths, dynamicRowH, {
+    drawTreatmentTypeRow(ctx, MARGIN_L, ttColWidths, {
       type: category,
       description: tc,
     });
   }
 
-  // Bottom line of table
-  drawHLine(ctx.page, ttTableX, ctx.y + 4, CONTENT_W, TABLE_BORDER);
+  // Bottom border of table
+  drawHLine(ctx.page, MARGIN_L, ctx.y + 4, CONTENT_W, TABLE_BORDER);
+  ctx.y -= 25;
 
+  // ── 23. Signature section ──
+  ensureSpace(ctx, 60);
+
+  ctx.page.drawText(
+    cleanText("Signed ___________________________________"),
+    {
+      x: MARGIN_L,
+      y: ctx.y,
+      size: 9,
+      font,
+      color: DARK,
+    }
+  );
+  ctx.page.drawText(
+    cleanText("Name: ___________________________________"),
+    {
+      x: PAGE_W / 2 + 20,
+      y: ctx.y,
+      size: 9,
+      font,
+      color: DARK,
+    }
+  );
   ctx.y -= 20;
 
-  // ── Signature section ──
-  ensureSpace(ctx, 40);
+  ctx.page.drawText(
+    cleanText(
+      "Address: ________________________________________________________________"
+    ),
+    {
+      x: MARGIN_L,
+      y: ctx.y,
+      size: 9,
+      font,
+      color: DARK,
+    }
+  );
+  ctx.y -= 20;
 
-  ctx.page.drawText("Signed ___________________________________", {
-    x: MARGIN_L,
-    y: ctx.y,
-    size: 9,
-    font,
-    color: DARK,
-  });
-  ctx.page.drawText("Name: ___________________________________", {
-    x: PAGE_W / 2 + 20,
-    y: ctx.y,
-    size: 9,
-    font,
-    color: DARK,
-  });
-  ctx.y -= 18;
+  ctx.page.drawText(
+    cleanText("Date: ___________________________________"),
+    {
+      x: MARGIN_L,
+      y: ctx.y,
+      size: 9,
+      font,
+      color: DARK,
+    }
+  );
+  ctx.y -= 35;
 
-  ctx.page.drawText("Address: ________________________________________________________________", {
-    x: MARGIN_L,
-    y: ctx.y,
-    size: 9,
-    font,
-    color: DARK,
-  });
-  ctx.y -= 18;
-
-  ctx.page.drawText("Date: ___________________________________", {
-    x: MARGIN_L,
-    y: ctx.y,
-    size: 9,
-    font,
-    color: DARK,
-  });
-  ctx.y -= 30;
-
-  // ── Bottom section: Kind Regards + Banking Details ──
+  // ── 24. Bottom section: Kind Regards + Banking Details ──
   ensureSpace(ctx, 120);
 
   const leftX = MARGIN_L;
   const rightX = PAGE_W / 2 + 40;
 
-  // Left side: Kind Regards
-  ctx.page.drawText("Kind Regards,", {
+  // Left: Kind Regards
+  ctx.page.drawText(cleanText("Kind Regards,"), {
     x: leftX,
     y: ctx.y,
     size: 9,
@@ -951,15 +915,18 @@ function drawPage3(
     color: DARK,
   });
 
-  // Right side: Banking Details
-  ctx.page.drawText("Banking Details for EFT payments:", {
-    x: rightX,
-    y: ctx.y,
-    size: 9,
-    font: boldFont,
-    color: DARK,
-  });
-  ctx.y -= 14;
+  // Right: Banking Details
+  ctx.page.drawText(
+    cleanText("Banking Details for EFT payments:"),
+    {
+      x: rightX,
+      y: ctx.y,
+      size: 9,
+      font: boldFont,
+      color: DARK,
+    }
+  );
+  ctx.y -= 16;
 
   const bankDetails = [
     ["Bank:", "FNB"],
@@ -970,41 +937,35 @@ function drawPage3(
   ];
 
   for (const [label, value] of bankDetails) {
-    ctx.page.drawText(label, {
+    ctx.page.drawText(cleanText(label), {
       x: rightX,
       y: ctx.y,
       size: 8,
       font,
       color: DARK,
     });
-    ctx.page.drawText(value, {
-      x: rightX + 70,
+    ctx.page.drawText(cleanText(value), {
+      x: rightX + 75,
       y: ctx.y,
       size: 8,
       font,
       color: DARK,
     });
-    ctx.y -= 12;
+    ctx.y -= 13;
   }
 
   // Left: Doctor name
-  ctx.page.drawText("Sheryl Smithies", {
+  const doctorName = cleanText(settings.name || "Dr Sheryl Smithies");
+  ctx.page.drawText(doctorName, {
     x: leftX,
-    y: ctx.y + 24,
-    size: 9,
-    font,
-    color: DARK,
-  });
-  ctx.page.drawText(settings.name || "Dr Sheryl Smithies", {
-    x: leftX,
-    y: ctx.y + 12,
+    y: ctx.y + 30,
     size: 9,
     font: boldFont,
     color: DARK,
   });
 
-  // SWIFT code on the right
-  ctx.page.drawText("SWIFT: FIRNZAJJ", {
+  // SWIFT on right
+  ctx.page.drawText(cleanText("SWIFT: FIRNZAJJ"), {
     x: rightX,
     y: ctx.y,
     size: 8,
@@ -1017,24 +978,127 @@ function drawPage3(
 // Drawing Helpers
 // ================================================================
 
+/** Add a new A4 page and reset Y */
 function newPage(ctx: DrawCtx) {
   ctx.page = ctx.doc.addPage([PAGE_W, PAGE_H]);
-  ctx.y = PAGE_H - 40;
+  ctx.y = 790;
 }
 
+/** Ensure enough vertical space; if not, start a new page with a small header */
 function ensureSpace(ctx: DrawCtx, needed: number) {
   if (ctx.y - needed < MARGIN_BOTTOM) {
     newPage(ctx);
+    drawSmallHeader(ctx);
+    ctx.y -= 15;
   }
 }
 
+/** Draw the full practice header (for page 1) */
+function drawPracticeHeader(ctx: DrawCtx) {
+  const { boldFont, font, settings } = ctx;
+
+  // Practice name - 13pt bold green centered
+  const practiceName = cleanText(
+    settings.name || "Dr Sheryl Smithies BChD (PRET)"
+  );
+  drawCenteredText(ctx, practiceName, {
+    size: 13,
+    font: boldFont,
+    color: GREEN,
+  });
+
+  // Phone - 8pt gray centered
+  if (settings.phone) {
+    drawCenteredText(ctx, cleanText(`T: ${settings.phone}`), {
+      size: 8,
+      font,
+      color: GRAY,
+    });
+  }
+
+  // Practice number / VAT - 8pt gray centered
+  if (settings.vatNumber) {
+    drawCenteredText(
+      ctx,
+      cleanText(
+        `Practice Number: ${settings.vatNumber}. VAT ${settings.vatNumber}`
+      ),
+      { size: 8, font, color: GRAY }
+    );
+  }
+
+  // Phone again - 8pt gray centered
+  if (settings.phone) {
+    drawCenteredText(ctx, cleanText(`t: ${settings.phone}`), {
+      size: 8,
+      font,
+      color: GRAY,
+    });
+  }
+
+  // Email - 8pt gray centered
+  if (settings.email) {
+    drawCenteredText(ctx, cleanText(`e: ${settings.email}`), {
+      size: 8,
+      font,
+      color: GRAY,
+    });
+  }
+}
+
+/** Draw a small header on continuation pages */
+function drawSmallHeader(ctx: DrawCtx) {
+  const name = cleanText(
+    ctx.settings.name || "Dr Sheryl Smithies BChD (PRET)"
+  );
+  const w = ctx.boldFont.widthOfTextAtSize(name, 10);
+  ctx.page.drawText(name, {
+    x: (PAGE_W - w) / 2,
+    y: ctx.y,
+    size: 10,
+    font: ctx.boldFont,
+    color: GREEN,
+  });
+  ctx.y -= 14;
+}
+
+/** Draw a section heading - 11pt bold green with a thin line underneath */
+function drawSectionHeading(ctx: DrawCtx, text: string) {
+  ensureSpace(ctx, 20);
+  ctx.page.drawText(cleanText(text), {
+    x: MARGIN_L,
+    y: ctx.y,
+    size: 11,
+    font: ctx.boldFont,
+    color: GREEN,
+  });
+  ctx.y -= 3;
+  drawHLine(ctx.page, MARGIN_L, ctx.y, CONTENT_W, TABLE_BORDER);
+  ctx.y -= 2;
+}
+
+/** Draw a sub-heading - 10pt bold green */
+function drawSubHeading(ctx: DrawCtx, text: string) {
+  ensureSpace(ctx, 16);
+  ctx.page.drawText(cleanText(text), {
+    x: MARGIN_L,
+    y: ctx.y,
+    size: 10,
+    font: ctx.boldFont,
+    color: GREEN,
+  });
+  ctx.y -= 14;
+}
+
+/** Draw centered text and advance Y */
 function drawCenteredText(
   ctx: DrawCtx,
   text: string,
   opts: { size: number; font: PDFFont; color: RGB }
 ) {
-  const w = opts.font.widthOfTextAtSize(text, opts.size);
-  ctx.page.drawText(text, {
+  const cleaned = cleanText(text);
+  const w = opts.font.widthOfTextAtSize(cleaned, opts.size);
+  ctx.page.drawText(cleaned, {
     x: (PAGE_W - w) / 2,
     y: ctx.y,
     size: opts.size,
@@ -1044,6 +1108,7 @@ function drawCenteredText(
   ctx.y -= opts.size + 4;
 }
 
+/** Draw word-wrapped text */
 function drawWrappedText(
   ctx: DrawCtx,
   text: string,
@@ -1051,8 +1116,7 @@ function drawWrappedText(
 ) {
   const indent = opts.indent || 0;
   const maxWidth = CONTENT_W - indent;
-  // Clean newlines and non-printable chars
-  const clean = text.replace(/\r?\n/g, " ").replace(/[^\x20-\x7E]/g, " ");
+  const clean = cleanText(text);
   const words = clean.split(/\s+/).filter(Boolean);
   let line = "";
 
@@ -1088,19 +1152,18 @@ function drawWrappedText(
   }
 }
 
+/** Wrap text into lines for measuring height */
 function wrapTextToLines(
   text: string,
   maxWidth: number,
   font: PDFFont,
   size: number
 ): string[] {
-  // Split on newlines first, then wrap each line by words
   const paragraphs = text.replace(/\r\n/g, "\n").split("\n");
   const lines: string[] = [];
 
   for (const para of paragraphs) {
-    // Clean any non-printable characters
-    const clean = para.replace(/[^\x20-\x7E]/g, " ").trim();
+    const clean = cleanText(para);
     if (!clean) {
       lines.push("");
       continue;
@@ -1123,12 +1186,13 @@ function wrapTextToLines(
   return lines;
 }
 
+/** Draw horizontal line */
 function drawHLine(
   page: PDFPage,
   x: number,
   y: number,
   width: number,
-  color: RGB = LIGHT_GRAY
+  color: RGB = TABLE_BORDER
 ) {
   page.drawLine({
     start: { x, y },
@@ -1138,6 +1202,7 @@ function drawHLine(
   });
 }
 
+/** Draw vertical line */
 function drawVLine(
   page: PDFPage,
   x: number,
@@ -1153,15 +1218,32 @@ function drawVLine(
   });
 }
 
-function drawTableHeaderRow(
+/** Compute cumulative column X positions */
+function computeColX(startX: number, colWidths: number[]): number[] {
+  const positions: number[] = [];
+  let x = startX;
+  for (const w of colWidths) {
+    positions.push(x);
+    x += w;
+  }
+  return positions;
+}
+
+/** Draw a table header row with dark background and white text */
+function drawTableHeader(
   ctx: DrawCtx,
   x: number,
   width: number,
   height: number,
-  columns: { text: string; width: number }[]
+  headers: string[],
+  colWidths: number[],
+  darkStyle = false
 ) {
   ensureSpace(ctx, height);
   const rowY = ctx.y;
+
+  const bgColor = darkStyle ? HEADER_BG : LIGHT_GRAY_BG;
+  const textColor = darkStyle ? WHITE : DARK;
 
   // Background
   ctx.page.drawRectangle({
@@ -1169,29 +1251,32 @@ function drawTableHeaderRow(
     y: rowY - height + 4,
     width,
     height,
-    color: LIGHT_GRAY,
+    color: bgColor,
     borderColor: TABLE_BORDER,
     borderWidth: 0.5,
   });
 
   // Column dividers and text
   let colX = x;
-  for (const col of columns) {
-    // Vertical divider
+  for (let i = 0; i < headers.length; i++) {
     if (colX > x) {
       drawVLine(ctx.page, colX, rowY + 4, height);
     }
 
-    // Header text
-    ctx.page.drawText(col.text, {
-      x: colX + 3,
-      y: rowY - 8,
-      size: 6.5,
+    const headerText = cleanText(headers[i]);
+    // Truncate header if too wide
+    const maxW = colWidths[i] - 6;
+    const truncated = truncateToWidth(headerText, maxW, ctx.boldFont, 8);
+
+    ctx.page.drawText(truncated, {
+      x: colX + 4,
+      y: rowY - 10,
+      size: 8,
       font: ctx.boldFont,
-      color: DARK,
+      color: textColor,
     });
 
-    colX += col.width;
+    colX += colWidths[i];
   }
 
   ctx.y -= height;
@@ -1208,55 +1293,119 @@ type TreatmentRowData = {
   total: string;
 };
 
+/** Draw a single treatment data row with alternating backgrounds */
 function drawTreatmentRow(
   ctx: DrawCtx,
   colX: number[],
   colWidths: number[],
   rowH: number,
+  rowIndex: number,
   data: TreatmentRowData
 ) {
   const rowY = ctx.y;
-  const sz = 7;
+  const sz = 8;
   const f = ctx.font;
 
-  // Row border
+  // Alternating row bg
+  const bgColor = rowIndex % 2 === 0 ? WHITE : ALT_ROW_BG;
+  ctx.page.drawRectangle({
+    x: colX[0],
+    y: rowY - rowH + 4,
+    width: CONTENT_W,
+    height: rowH,
+    color: bgColor,
+  });
+
+  // Row border top
   drawHLine(ctx.page, colX[0], rowY + 4, CONTENT_W, TABLE_BORDER);
 
   // Draw vertical dividers
-  for (let i = 1; i < colX.length; i++) {
+  for (let i = 0; i < colX.length; i++) {
     drawVLine(ctx.page, colX[i], rowY + 4, rowH);
   }
   // Right edge
   drawVLine(ctx.page, colX[0] + CONTENT_W, rowY + 4, rowH);
-  // Left edge
-  drawVLine(ctx.page, colX[0], rowY + 4, rowH);
 
-  const textY = rowY - 6;
+  const textY = rowY - 10;
+
+  // Clean and truncate all cell text
+  const codeText = truncateToWidth(cleanText(data.code), colWidths[0] - 6, f, sz);
+  const descText = truncateToWidth(cleanText(data.desc), colWidths[1] - 6, f, sz);
+  const icd10Text = truncateToWidth(cleanText(data.icd10), colWidths[2] - 6, f, sz);
+  const provText = truncateToWidth(cleanText(data.provider), colWidths[3] - 6, f, sz);
+  const toothText = truncateToWidth(cleanText(data.toothNumbers), colWidths[4] - 6, f, sz);
+  const unitPriceText = cleanText(data.unitPrice);
+  const unitsText = cleanText(data.units);
+  const totalText = cleanText(data.total);
 
   // Item Code
-  ctx.page.drawText(data.code, { x: colX[0] + 3, y: textY, size: sz, font: f, color: DARK });
+  ctx.page.drawText(codeText, {
+    x: colX[0] + 4,
+    y: textY,
+    size: sz,
+    font: f,
+    color: DARK,
+  });
   // Description
-  ctx.page.drawText(data.desc, { x: colX[1] + 3, y: textY, size: sz, font: f, color: DARK });
+  ctx.page.drawText(descText, {
+    x: colX[1] + 4,
+    y: textY,
+    size: sz,
+    font: f,
+    color: DARK,
+  });
   // ICD-10
-  if (data.icd10) {
-    ctx.page.drawText(data.icd10, { x: colX[2] + 3, y: textY, size: 6, font: f, color: GRAY });
+  if (icd10Text) {
+    ctx.page.drawText(icd10Text, {
+      x: colX[2] + 4,
+      y: textY,
+      size: sz,
+      font: f,
+      color: GRAY,
+    });
   }
   // Provider
-  if (data.provider) {
-    ctx.page.drawText(data.provider, { x: colX[3] + 3, y: textY, size: sz, font: f, color: DARK });
+  if (provText) {
+    ctx.page.drawText(provText, {
+      x: colX[3] + 4,
+      y: textY,
+      size: sz,
+      font: f,
+      color: DARK,
+    });
   }
   // Tooth Numbers
-  if (data.toothNumbers) {
-    ctx.page.drawText(data.toothNumbers, { x: colX[4] + 3, y: textY, size: sz, font: f, color: DARK });
+  if (toothText) {
+    ctx.page.drawText(toothText, {
+      x: colX[4] + 4,
+      y: textY,
+      size: sz,
+      font: f,
+      color: DARK,
+    });
   }
-  // Per Unit Price
-  ctx.page.drawText(data.unitPrice, { x: colX[5] + 3, y: textY, size: sz, font: f, color: DARK });
-  // Units
-  ctx.page.drawText(data.units, { x: colX[6] + 3, y: textY, size: sz, font: f, color: DARK });
+  // Per Unit Price (right-aligned)
+  const upW = f.widthOfTextAtSize(unitPriceText, sz);
+  ctx.page.drawText(unitPriceText, {
+    x: colX[5] + colWidths[5] - upW - 4,
+    y: textY,
+    size: sz,
+    font: f,
+    color: DARK,
+  });
+  // Units (right-aligned)
+  const uW = f.widthOfTextAtSize(unitsText, sz);
+  ctx.page.drawText(unitsText, {
+    x: colX[6] + colWidths[6] - uW - 4,
+    y: textY,
+    size: sz,
+    font: f,
+    color: DARK,
+  });
   // Total (right-aligned)
-  const totalW = f.widthOfTextAtSize(data.total, sz);
-  ctx.page.drawText(data.total, {
-    x: colX[7] + colWidths[7] - totalW - 4,
+  const tW = f.widthOfTextAtSize(totalText, sz);
+  ctx.page.drawText(totalText, {
+    x: colX[7] + colWidths[7] - tW - 4,
     y: textY,
     size: sz,
     font: f,
@@ -1266,15 +1415,39 @@ function drawTreatmentRow(
   ctx.y -= rowH;
 }
 
+/** Draw a treatment type row with wrapped text */
 function drawTreatmentTypeRow(
   ctx: DrawCtx,
   tableX: number,
   colWidths: number[],
-  rowH: number,
   data: { type: string; description: string }
 ) {
-  const rowY = ctx.y;
   const { font, boldFont } = ctx;
+
+  // Calculate required row height based on content
+  const maxDescWidth = colWidths[1] - 8;
+  const maxTypeWidth = colWidths[0] - 8;
+  const descLines = wrapTextToLines(
+    cleanText(data.description),
+    maxDescWidth,
+    font,
+    6.5
+  );
+  const typeLines = wrapTextToLines(
+    cleanText(data.type),
+    maxTypeWidth,
+    boldFont,
+    7
+  );
+  const lineH = 9;
+  const rowH = Math.max(
+    30,
+    Math.max(descLines.length, typeLines.length) * lineH + 12
+  );
+
+  ensureSpace(ctx, rowH);
+
+  const rowY = ctx.y;
 
   // Row outline
   ctx.page.drawRectangle({
@@ -1297,8 +1470,7 @@ function drawTreatmentTypeRow(
   }
 
   // Treatment type (bold, left column)
-  const typeLines = wrapTextToLines(data.type, colWidths[0] - 8, boldFont, 7);
-  let typeY = rowY - 8;
+  let typeY = rowY - 10;
   for (const line of typeLines) {
     ctx.page.drawText(line, {
       x: tableX + 4,
@@ -1307,14 +1479,12 @@ function drawTreatmentTypeRow(
       font: boldFont,
       color: DARK,
     });
-    typeY -= 9;
+    typeY -= lineH;
   }
 
   // Description (middle column, wrapped)
   const descCol2X = tableX + colWidths[0];
-  const descMaxW = colWidths[1] - 8;
-  const descLines = wrapTextToLines(data.description, descMaxW, font, 6.5);
-  let descY = rowY - 8;
+  let descY = rowY - 10;
   for (const line of descLines) {
     ctx.page.drawText(line, {
       x: descCol2X + 4,
@@ -1323,52 +1493,46 @@ function drawTreatmentTypeRow(
       font,
       color: DARK,
     });
-    descY -= 9;
+    descY -= lineH;
   }
 
   ctx.y -= rowH;
 }
 
+/** Draw tooth diagram labels */
 function drawToothDiagramLabels(ctx: DrawCtx) {
   const { font, boldFont, italicFont } = ctx;
 
-  ensureSpace(ctx, 50);
+  ensureSpace(ctx, 55);
 
   // Title
-  ctx.page.drawText("Tooth Diagram", {
-    x: MARGIN_L,
-    y: ctx.y,
-    size: 9,
-    font: boldFont,
-    color: GREEN,
-  });
-  ctx.y -= 14;
+  drawSectionHeading(ctx, "Tooth Diagram");
+  ctx.y -= 10;
 
-  // Upper teeth labels
   const upperRight = [18, 17, 16, 15, 14, 13, 12, 11];
   const upperLeft = [21, 22, 23, 24, 25, 26, 27, 28];
   const lowerRight = [48, 47, 46, 45, 44, 43, 42, 41];
   const lowerLeft = [31, 32, 33, 34, 35, 36, 37, 38];
 
   const centerX = PAGE_W / 2;
-  const spacing = 28;
+  const spacing = 26;
 
   // "Patient's Right" label
-  ctx.page.drawText("Patient's Right", {
+  ctx.page.drawText(cleanText("Patient's Right"), {
     x: MARGIN_L,
     y: ctx.y + 6,
-    size: 6,
+    size: 7,
     font: italicFont,
     color: GRAY,
   });
 
   // "Patient's Left" label
-  const plText = "Patient's Left";
-  const plW = italicFont.widthOfTextAtSize(plText, 6);
+  const plText = cleanText("Patient's Left");
+  const plW = italicFont.widthOfTextAtSize(plText, 7);
   ctx.page.drawText(plText, {
     x: PAGE_W - MARGIN_R - plW,
     y: ctx.y + 6,
-    size: 6,
+    size: 7,
     font: italicFont,
     color: GRAY,
   });
@@ -1379,7 +1543,7 @@ function drawToothDiagramLabels(ctx: DrawCtx) {
     ctx.page.drawText(String(upperRight[i]), {
       x,
       y: ctx.y,
-      size: 6,
+      size: 7,
       font,
       color: DARK,
     });
@@ -1389,7 +1553,7 @@ function drawToothDiagramLabels(ctx: DrawCtx) {
     ctx.page.drawText(String(upperLeft[i]), {
       x,
       y: ctx.y,
-      size: 6,
+      size: 7,
       font,
       color: DARK,
     });
@@ -1399,7 +1563,7 @@ function drawToothDiagramLabels(ctx: DrawCtx) {
   drawVLine(ctx.page, centerX, ctx.y + 6, 24, GRAY);
   ctx.y -= 6;
   drawHLine(ctx.page, MARGIN_L + 40, ctx.y, CONTENT_W - 80, GRAY);
-  ctx.y -= 6;
+  ctx.y -= 8;
 
   // Lower row
   for (let i = 0; i < lowerRight.length; i++) {
@@ -1407,7 +1571,7 @@ function drawToothDiagramLabels(ctx: DrawCtx) {
     ctx.page.drawText(String(lowerRight[i]), {
       x,
       y: ctx.y,
-      size: 6,
+      size: 7,
       font,
       color: DARK,
     });
@@ -1417,13 +1581,13 @@ function drawToothDiagramLabels(ctx: DrawCtx) {
     ctx.page.drawText(String(lowerLeft[i]), {
       x,
       y: ctx.y,
-      size: 6,
+      size: 7,
       font,
       color: DARK,
     });
   }
 
-  ctx.y -= 10;
+  ctx.y -= 12;
 }
 
 // ── Formatting helpers ──────────────────────────────────────
@@ -1435,8 +1599,32 @@ function fmtR(n: number): string {
   })}`;
 }
 
-function truncate(s: string, maxLen: number): string {
-  return s.length > maxLen ? s.substring(0, maxLen - 1) + "\u2026" : s;
+/** Truncate string to fit within pixel width, adding "..." if needed */
+function truncateToWidth(
+  text: string,
+  maxWidth: number,
+  font: PDFFont,
+  size: number
+): string {
+  if (!text) return "";
+  const w = font.widthOfTextAtSize(text, size);
+  if (w <= maxWidth) return text;
+
+  // Binary search for the right length
+  let lo = 0;
+  let hi = text.length;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    const candidate = text.substring(0, mid) + "...";
+    const cw = font.widthOfTextAtSize(candidate, size);
+    if (cw <= maxWidth) {
+      lo = mid + 1;
+    } else {
+      hi = mid;
+    }
+  }
+  if (lo <= 1) return "...";
+  return text.substring(0, lo - 1) + "...";
 }
 
 function formatCategoryName(category: string): string {
@@ -1455,7 +1643,9 @@ function formatCategoryName(category: string): string {
     aesthetic: "Aesthetic Treatments",
     basic: "Basic Per-Visit",
   };
-  return names[category] || category.charAt(0).toUpperCase() + category.slice(1);
+  return (
+    names[category] || category.charAt(0).toUpperCase() + category.slice(1)
+  );
 }
 
 function slug(s: string) {

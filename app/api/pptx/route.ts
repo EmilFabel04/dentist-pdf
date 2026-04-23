@@ -60,19 +60,21 @@ export async function POST(request: Request) {
     });
 
     // ── Slide 2: Replace patient info ────────────────────
-    // "Patient Name:" is the label (kept), "Patient Name" is the value (replaced)
-    // "SEE MAIN COMPLAINT ON PATIENT NOTES" → actual complaint
+    // "SEE MAIN COMPLAINT ON PATIENT NOTES" -> actual complaint
     await replaceSlideText(zip, 2, {
       "SEE MAIN COMPLAINT ON PATIENT NOTES":
         mainComplaint || report.patientSummary || "\u2014",
     });
+
     // Replace the standalone "Patient Name" value (not the "Patient Name:" label)
-    const slide2Xml = await zip.file("ppt/slides/slide2.xml")!.async("string");
-    const updatedSlide2 = slide2Xml.replace(
-      />Patient Name</,
-      `>${escapeXml(patientName)}<`
-    );
-    zip.file("ppt/slides/slide2.xml", updatedSlide2);
+    // We do this separately: find "Patient Name" that is NOT followed by ":"
+    const slide2Path = "ppt/slides/slide2.xml";
+    const slide2File = zip.file(slide2Path);
+    if (slide2File) {
+      let slide2Xml = await slide2File.async("string");
+      slide2Xml = replaceStandalonePatientName(slide2Xml, patientName);
+      zip.file(slide2Path, slide2Xml);
+    }
 
     // ── Slide 3: Replace extra oral photos ───────────────
     // Template images: image6.jpeg through image11.jpeg
@@ -130,45 +132,29 @@ export async function POST(request: Request) {
 
     // ── Slide 11: Replace treatment options ──────────────
     const options = selectedTreatments.slice(0, 3);
-    const optionTexts: Record<string, string> = {};
+    const slide11Replacements: Record<string, string> = {};
 
     if (options.length > 0) {
       const opt1 = options[0];
-      optionTexts["Treatment option 1"] = `${opt1.treatment.name}: ${opt1.selectedCodes.map((c) => c.description).join(", ")}`;
+      slide11Replacements["Treatment option 1"] =
+        `${opt1.treatment.name}: ${opt1.selectedCodes.map((c) => c.description).join(", ")}`;
     }
     if (options.length > 1) {
       const opt2 = options[1];
-      optionTexts["Treatment Option 2"] = `${opt2.treatment.name}: ${opt2.selectedCodes.map((c) => c.description).join(", ")}`;
+      slide11Replacements["Treatment Option 2"] =
+        `${opt2.treatment.name}: ${opt2.selectedCodes.map((c) => c.description).join(", ")}`;
     }
     if (options.length > 2) {
       const opt3 = options[2];
-      optionTexts["Treatment Option 3"] = `${opt3.treatment.name}: ${opt3.selectedCodes.map((c) => c.description).join(", ")}`;
+      slide11Replacements["Treatment Option 3"] =
+        `${opt3.treatment.name}: ${opt3.selectedCodes.map((c) => c.description).join(", ")}`;
     }
 
-    // Replace time frames and treatment option texts
-    const slide11Xml = await zip
-      .file("ppt/slides/slide11.xml")!
-      .async("string");
-    let updatedSlide11 = slide11Xml;
-
-    // Replace the "Time" placeholders (there are three)
-    let timeCount = 0;
+    // Replace "Time" placeholders on slide 11
     const followUpText = report.followUp || "To be confirmed";
-    updatedSlide11 = updatedSlide11.replace(/>Time</g, () => {
-      timeCount++;
-      if (timeCount === 1) return `>${escapeXml(followUpText)}<`;
-      return `>\u2014<`;
-    });
+    slide11Replacements["Time"] = followUpText;
 
-    // Replace treatment option texts
-    for (const [find, replace] of Object.entries(optionTexts)) {
-      updatedSlide11 = updatedSlide11.replace(
-        new RegExp(`>${escapeRegex(find)}<`, "g"),
-        `>${escapeXml(replace)}<`
-      );
-    }
-
-    zip.file("ppt/slides/slide11.xml", updatedSlide11);
+    await replaceSlideText(zip, 11, slide11Replacements);
 
     // ── Generate output ─────────────────────────────────
     const buffer = await zip.generateAsync({
@@ -197,6 +183,10 @@ export async function POST(request: Request) {
 
 // ── Helpers ──────────────────────────────────────────────────
 
+/**
+ * Replace text in a slide's XML, handling text that may be split
+ * across multiple <a:t> (run) elements by PowerPoint.
+ */
 async function replaceSlideText(
   zip: JSZip,
   slideNumber: number,
@@ -208,23 +198,203 @@ async function replaceSlideText(
 
   let xml = await file.async("string");
   for (const [find, replace] of Object.entries(replacements)) {
-    // Replace text content within <a:t> tags
-    xml = xml.replace(
-      new RegExp(`>${escapeRegex(find)}<`, "g"),
-      `>${escapeXml(replace)}<`
-    );
+    // Apply repeatedly until no more matches (handles multiple occurrences)
+    let prev = "";
+    while (prev !== xml) {
+      prev = xml;
+      xml = replaceTextInXml(xml, find, replace);
+    }
   }
   zip.file(path, xml);
+}
+
+/**
+ * Finds target text that may span multiple <a:t> elements and replaces it.
+ * Puts the replacement text in the first affected run, empties the rest.
+ */
+function replaceTextInXml(
+  xml: string,
+  find: string,
+  replace: string
+): string {
+  // Collect all <a:t>...</a:t> with their positions
+  const textRegex = /<a:t>([^<]*)<\/a:t>/g;
+  const segments: { start: number; end: number; text: string }[] = [];
+  let m;
+  while ((m = textRegex.exec(xml)) !== null) {
+    segments.push({
+      start: m.index,
+      end: m.index + m[0].length,
+      text: m[1],
+    });
+  }
+
+  // Concatenate all text to find matches
+  let fullText = "";
+  const segMap: { segIdx: number; charStart: number; charEnd: number }[] = [];
+  for (let i = 0; i < segments.length; i++) {
+    const charStart = fullText.length;
+    fullText += segments[i].text;
+    segMap.push({ segIdx: i, charStart, charEnd: fullText.length });
+  }
+
+  const matchIdx = fullText.indexOf(find);
+  if (matchIdx === -1) return xml;
+
+  const matchEnd = matchIdx + find.length;
+
+  // Find which segments overlap with the match
+  const affectedSegs: number[] = [];
+  for (const sm of segMap) {
+    if (sm.charEnd > matchIdx && sm.charStart < matchEnd) {
+      affectedSegs.push(sm.segIdx);
+    }
+  }
+
+  if (affectedSegs.length === 0) return xml;
+
+  // Replace: put the full replacement in the first affected segment,
+  // empty the rest, preserving any text before/after the match in edge segments
+  let result = xml;
+  // Process in reverse order so positions don't shift
+  for (let i = affectedSegs.length - 1; i >= 0; i--) {
+    const segIdx = affectedSegs[i];
+    const seg = segments[segIdx];
+    const sm = segMap[segIdx];
+
+    let newText: string;
+    if (i === 0) {
+      // First segment: include any text before the match + replacement + any text after
+      const beforeMatch = seg.text.substring(
+        0,
+        Math.max(0, matchIdx - sm.charStart)
+      );
+      const afterMatch =
+        i === affectedSegs.length - 1
+          ? seg.text.substring(
+              Math.min(seg.text.length, matchEnd - sm.charStart)
+            )
+          : "";
+      newText = beforeMatch + escapeXml(replace) + afterMatch;
+    } else if (i === affectedSegs.length - 1) {
+      // Last segment: keep any text after the match
+      const afterMatch = seg.text.substring(
+        Math.min(seg.text.length, matchEnd - sm.charStart)
+      );
+      newText = afterMatch;
+    } else {
+      // Middle segments: empty them
+      newText = "";
+    }
+
+    result =
+      result.substring(0, seg.start) +
+      `<a:t>${newText}</a:t>` +
+      result.substring(seg.end);
+  }
+
+  return result;
+}
+
+/**
+ * On slide 2, "Patient Name" appears twice: once as the label "Patient Name:"
+ * and once as the standalone value "Patient Name". We only want to replace
+ * the standalone value (the one NOT followed by ":").
+ *
+ * Strategy: extract all <a:t> content, find "Patient Name" occurrences,
+ * and only replace the one where the next character is NOT ":".
+ */
+function replaceStandalonePatientName(xml: string, patientName: string): string {
+  const find = "Patient Name";
+
+  const textRegex = /<a:t>([^<]*)<\/a:t>/g;
+  const segments: { start: number; end: number; text: string }[] = [];
+  let m;
+  while ((m = textRegex.exec(xml)) !== null) {
+    segments.push({
+      start: m.index,
+      end: m.index + m[0].length,
+      text: m[1],
+    });
+  }
+
+  let fullText = "";
+  const segMap: { segIdx: number; charStart: number; charEnd: number }[] = [];
+  for (let i = 0; i < segments.length; i++) {
+    const charStart = fullText.length;
+    fullText += segments[i].text;
+    segMap.push({ segIdx: i, charStart, charEnd: fullText.length });
+  }
+
+  // Find all occurrences of "Patient Name" and pick the standalone one
+  let searchFrom = 0;
+  let targetIdx = -1;
+  while (searchFrom < fullText.length) {
+    const idx = fullText.indexOf(find, searchFrom);
+    if (idx === -1) break;
+    const afterChar = fullText[idx + find.length];
+    // Standalone = not followed by ":"
+    if (afterChar !== ":") {
+      targetIdx = idx;
+      break;
+    }
+    searchFrom = idx + 1;
+  }
+
+  if (targetIdx === -1) return xml;
+
+  const matchEnd = targetIdx + find.length;
+
+  const affectedSegs: number[] = [];
+  for (const sm of segMap) {
+    if (sm.charEnd > targetIdx && sm.charStart < matchEnd) {
+      affectedSegs.push(sm.segIdx);
+    }
+  }
+
+  if (affectedSegs.length === 0) return xml;
+
+  let result = xml;
+  for (let i = affectedSegs.length - 1; i >= 0; i--) {
+    const segIdx = affectedSegs[i];
+    const seg = segments[segIdx];
+    const sm = segMap[segIdx];
+
+    let newText: string;
+    if (i === 0) {
+      const beforeMatch = seg.text.substring(
+        0,
+        Math.max(0, targetIdx - sm.charStart)
+      );
+      const afterMatch =
+        i === affectedSegs.length - 1
+          ? seg.text.substring(
+              Math.min(seg.text.length, matchEnd - sm.charStart)
+            )
+          : "";
+      newText = beforeMatch + escapeXml(patientName) + afterMatch;
+    } else if (i === affectedSegs.length - 1) {
+      const afterMatch = seg.text.substring(
+        Math.min(seg.text.length, matchEnd - sm.charStart)
+      );
+      newText = afterMatch;
+    } else {
+      newText = "";
+    }
+
+    result =
+      result.substring(0, seg.start) +
+      `<a:t>${newText}</a:t>` +
+      result.substring(seg.end);
+  }
+
+  return result;
 }
 
 function dataUrlToBuffer(dataUrl: string): Buffer | null {
   const match = dataUrl.match(/^data:[^;]+;base64,(.+)$/);
   if (!match) return null;
   return Buffer.from(match[1], "base64");
-}
-
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function escapeXml(str: string): string {

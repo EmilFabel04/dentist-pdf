@@ -266,13 +266,13 @@ function drawPage1(
     { text: "Appointment Length", width: apptTableColWidths[2] },
   ]);
 
-  // Data rows
-  const maxAppts = Math.min(appointmentCount, 7);
-  for (let i = 0; i < 7; i++) {
+  // Data rows — dynamic based on actual appointment count
+  for (let i = 0; i < appointmentCount; i++) {
     ensureSpace(ctx, apptRowH);
-    const cellData = i < maxAppts
-      ? [{ text: `Appointment ${i + 1}`, width: apptTableColWidths[0] + apptTableColWidths[1] }, { text: "", width: apptTableColWidths[2] }]
-      : [{ text: "", width: apptTableColWidths[0] + apptTableColWidths[1] }, { text: "", width: apptTableColWidths[2] }];
+    const cellData = [
+      { text: `Appointment ${i + 1}`, width: apptTableColWidths[0] + apptTableColWidths[1] },
+      { text: "", width: apptTableColWidths[2] },
+    ];
 
     // Draw row borders
     const rowY = ctx.y;
@@ -296,15 +296,13 @@ function drawPage1(
     }
 
     // Text
-    if (i < maxAppts) {
-      ctx.page.drawText(`Appointment ${i + 1}`, {
-        x: apptTableX + 4,
-        y: rowY - 8,
-        size: 8,
-        font,
-        color: DARK,
-      });
-    }
+    ctx.page.drawText(`Appointment ${i + 1}`, {
+      x: apptTableX + 4,
+      y: rowY - 8,
+      size: 8,
+      font,
+      color: DARK,
+    });
 
     ctx.y -= apptRowH;
   }
@@ -869,13 +867,16 @@ function drawPage3(
     description: "Standard infection control and PPE protocols are followed for all treatments to ensure your safety.",
   });
 
-  // Dynamic rows from selected treatments
+  // Dynamic rows from selected treatments — use treatment name, deduplicate by T&C content
   const treatmentTCs = new Map<string, string>();
   for (const st of selectedTreatments) {
     if (st.treatment.termsAndConditions) {
-      const category = st.treatment.category || st.treatment.name;
-      if (!treatmentTCs.has(category)) {
-        treatmentTCs.set(category, st.treatment.termsAndConditions);
+      // Use the treatment name as display, skip if we already have this exact T&C
+      const tcText = st.treatment.termsAndConditions.replace(/---/g, "").trim();
+      const existingValues = [...treatmentTCs.values()];
+      if (!existingValues.some(v => v === tcText)) {
+        const displayName = formatCategoryName(st.treatment.category || st.treatment.name);
+        treatmentTCs.set(displayName, tcText);
       }
     }
   }
@@ -1423,6 +1424,25 @@ function fmtR(n: number): string {
 
 function truncate(s: string, maxLen: number): string {
   return s.length > maxLen ? s.substring(0, maxLen - 1) + "\u2026" : s;
+}
+
+function formatCategoryName(category: string): string {
+  const names: Record<string, string> = {
+    diagnostic: "Consultation / Check Up",
+    preventive: "Scale and Polish / Hygiene",
+    restorative: "Restorations",
+    endodontic: "Root Canal Treatment",
+    crown: "Crown and Bridge",
+    bridge: "Crown and Bridge",
+    prosthodontic: "Prosthodontics",
+    implant: "Implants",
+    surgical: "Oral Surgery",
+    periodontal: "Periodontics",
+    orthodontic: "Orthodontics",
+    aesthetic: "Aesthetic Treatments",
+    basic: "Basic Per-Visit",
+  };
+  return names[category] || category.charAt(0).toUpperCase() + category.slice(1);
 }
 
 function slug(s: string) {

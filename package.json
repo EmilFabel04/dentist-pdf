@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "seed": "tsx scripts/seed-treatments.ts"
+    "seed": "tsx scripts/seed-treatments.ts",
+    "upload-templates": "tsx scripts/upload-templates.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.3",

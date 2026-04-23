@@ -71,6 +71,7 @@ function NewEstimateInner() {
   const refineTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Documents
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
   const [xlsxBlob, setXlsxBlob] = useState<Blob | null>(null);
 
   // General
@@ -526,33 +527,49 @@ function NewEstimateInner() {
         }
       }
 
-      const xlsxRes = await fetch("/api/xlsx", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+      const requestBody = JSON.stringify({
+        patientName: selectedPatient.name,
+        date: today,
+        quoteRef,
+        selectedTreatments,
+        settings: settings || {
+          name: "",
+          logo: "",
+          address: "",
+          phone: "",
+          email: "",
+          vatNumber: "",
+          currency: "USD",
+          vatRate: 0,
+          quoteValidityDays: 30,
+          defaultPaymentTerms: "",
         },
-        body: JSON.stringify({
-          patientName: selectedPatient.name,
-          date: today,
-          quoteRef,
-          selectedTreatments,
-          settings: settings || {
-            name: "",
-            logo: "",
-            address: "",
-            phone: "",
-            email: "",
-            vatNumber: "",
-            currency: "USD",
-            vatRate: 0,
-            quoteValidityDays: 30,
-            defaultPaymentTerms: "",
-          },
-          appointmentCount,
-          basicCodes,
-        }),
+        appointmentCount,
+        basicCodes,
       });
+
+      const requestHeaders = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      };
+
+      // Generate PDF (primary) and XLSX (secondary) in parallel
+      const [pdfRes, xlsxRes] = await Promise.all([
+        fetch("/api/estimate-pdf", {
+          method: "POST",
+          headers: requestHeaders,
+          body: requestBody,
+        }),
+        fetch("/api/xlsx", {
+          method: "POST",
+          headers: requestHeaders,
+          body: requestBody,
+        }),
+      ]);
+
+      if (pdfRes.ok) {
+        setPdfBlob(await pdfRes.blob());
+      }
       if (xlsxRes.ok) {
         setXlsxBlob(await xlsxRes.blob());
       }
@@ -1009,9 +1026,22 @@ function NewEstimateInner() {
         <div className={styles.section}>
           <div className={styles.sectionTitle}>Documents</div>
           <div className={styles.downloadRow}>
-            {xlsxBlob && (
+            {pdfBlob && (
               <button
                 className={styles.downloadBtnGreen}
+                onClick={() =>
+                  downloadBlob(
+                    pdfBlob,
+                    `estimate-${selectedPatient?.name.replace(/\s+/g, "-").toLowerCase()}-${new Date().toISOString().split("T")[0]}.pdf`
+                  )
+                }
+              >
+                Download PDF
+              </button>
+            )}
+            {xlsxBlob && (
+              <button
+                className={styles.newPatientBtn}
                 onClick={() =>
                   downloadBlob(
                     xlsxBlob,

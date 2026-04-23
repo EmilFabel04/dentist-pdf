@@ -72,7 +72,7 @@ function NewEstimateInner() {
 
   // Documents
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
-  const [xlsxBlob, setXlsxBlob] = useState<Blob | null>(null);
+  // xlsx removed — PDF only
 
   // General
   const [error, setError] = useState("");
@@ -553,25 +553,15 @@ function NewEstimateInner() {
         Authorization: `Bearer ${token}`,
       };
 
-      // Generate PDF (primary) and XLSX (secondary) in parallel
-      const [pdfRes, xlsxRes] = await Promise.all([
-        fetch("/api/estimate-pdf", {
-          method: "POST",
-          headers: requestHeaders,
-          body: requestBody,
-        }),
-        fetch("/api/xlsx", {
-          method: "POST",
-          headers: requestHeaders,
-          body: requestBody,
-        }),
-      ]);
+      // Generate PDF
+      const pdfRes = await fetch("/api/estimate-pdf", {
+        method: "POST",
+        headers: requestHeaders,
+        body: requestBody,
+      });
 
       if (pdfRes.ok) {
         setPdfBlob(await pdfRes.blob());
-      }
-      if (xlsxRes.ok) {
-        setXlsxBlob(await xlsxRes.blob());
       }
 
       setPhase("done");
@@ -1030,19 +1020,6 @@ function NewEstimateInner() {
                 }
               >
                 Download PDF
-              </button>
-            )}
-            {xlsxBlob && (
-              <button
-                className={styles.newPatientBtn}
-                onClick={() =>
-                  downloadBlob(
-                    xlsxBlob,
-                    `estimate-${selectedPatient?.name.replace(/\s+/g, "-").toLowerCase()}-${new Date().toISOString().split("T")[0]}.xlsx`
-                  )
-                }
-              >
-                Download .xlsx
               </button>
             )}
           </div>

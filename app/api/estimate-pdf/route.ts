@@ -1051,7 +1051,9 @@ function drawWrappedText(
 ) {
   const indent = opts.indent || 0;
   const maxWidth = CONTENT_W - indent;
-  const words = text.split(" ");
+  // Clean newlines and non-printable chars
+  const clean = text.replace(/\r?\n/g, " ").replace(/[^\x20-\x7E]/g, " ");
+  const words = clean.split(/\s+/).filter(Boolean);
   let line = "";
 
   for (const word of words) {
@@ -1092,21 +1094,32 @@ function wrapTextToLines(
   font: PDFFont,
   size: number
 ): string[] {
-  const words = text.split(" ");
+  // Split on newlines first, then wrap each line by words
+  const paragraphs = text.replace(/\r\n/g, "\n").split("\n");
   const lines: string[] = [];
-  let line = "";
 
-  for (const word of words) {
-    const testLine = line ? `${line} ${word}` : word;
-    const testWidth = font.widthOfTextAtSize(testLine, size);
-    if (testWidth > maxWidth && line) {
-      lines.push(line);
-      line = word;
-    } else {
-      line = testLine;
+  for (const para of paragraphs) {
+    // Clean any non-printable characters
+    const clean = para.replace(/[^\x20-\x7E]/g, " ").trim();
+    if (!clean) {
+      lines.push("");
+      continue;
     }
+    const words = clean.split(/\s+/);
+    let line = "";
+
+    for (const word of words) {
+      const testLine = line ? `${line} ${word}` : word;
+      const testWidth = font.widthOfTextAtSize(testLine, size);
+      if (testWidth > maxWidth && line) {
+        lines.push(line);
+        line = word;
+      } else {
+        line = testLine;
+      }
+    }
+    if (line) lines.push(line);
   }
-  if (line) lines.push(line);
   return lines;
 }
 

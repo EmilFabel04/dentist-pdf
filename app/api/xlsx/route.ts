@@ -64,6 +64,19 @@ export async function POST(request: Request) {
     // Get the Full Estimate sheet XML
     let sheetXml = await zip.file("xl/worksheets/sheet1.xml")!.async("string");
 
+    // ── 0. Strip ALL formulas from the sheet ──────────────
+    // The template has 165 VLOOKUP formulas referencing Table1/Table2.
+    // These break because we're providing data directly, not via the lookup table.
+    // Replace every formula cell with either its cached value or empty.
+    sheetXml = stripAllFormulas(sheetXml);
+
+    // Also strip formulas from third-party fee rows (84-88) and T&C rows (154-159)
+    for (let r = 84; r <= 88; r++) {
+      for (const col of ["D", "E", "F", "G", "H", "I", "J", "K", "L", "M"]) {
+        sheetXml = clearCell(sheetXml, `${col}${r}`);
+      }
+    }
+
     // ── 1. Fill patient name and date (row 17) ──────────────
     sheetXml = setCellInlineString(sheetXml, "B17", `Dear ${patientName}`);
     sheetXml = setCellInlineString(sheetXml, "K17", `Date: ${date}`);
@@ -328,6 +341,23 @@ function getAppointmentTreatments(
 ): SelectedTreatment[] {
   if (totalAppointments <= 1) return treatments;
   return treatments.filter((_, idx) => idx % totalAppointments === appointmentIndex);
+}
+
+/**
+ * Strip ALL formula elements from the sheet XML.
+ * Replaces <f>...</f> and <f .../> tags, keeping cached <v> values.
+ * Also removes t="e" (error type) from cells that had broken formulas.
+ */
+function stripAllFormulas(xml: string): string {
+  // Remove <f>...</f> tags (formulas with content)
+  let result = xml.replace(/<f>[^<]*<\/f>/g, "");
+  // Remove <f .../> tags (shared formulas etc)
+  result = result.replace(/<f[^>]*\/>/g, "");
+  // Remove <f ...>...</f> tags (formulas with attributes)
+  result = result.replace(/<f[^>]*>[^<]*<\/f>/g, "");
+  // Remove t="e" (error type) — these cells had #N/A, change to plain value
+  result = result.replace(/ t="e"/g, "");
+  return result;
 }
 
 function escapeXml(str: string): string {

@@ -522,3 +522,32 @@
 .refineTextarea:focus {
   border-color: #579158;
 }
+
+/* ── Record or Type ───────────────────────────────────────── */
+
+.inputModeRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.typeSection {
+  margin-top: 8px;
+}
+
+.transcriptTextarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  resize: vertical;
+  outline: none;
+  margin-top: 4px;
+}
+
+.transcriptTextarea:focus {
+  border-color: #579158;
+}

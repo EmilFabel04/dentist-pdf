@@ -879,29 +879,25 @@ function NewEstimateInner() {
         )}
       </div>
 
-      {/* ── 3. Voice Recording ──────────────────────────────────── */}
+      {/* ── 3. Treatment Plan Notes (Record or Type) ──────────────── */}
       <div className={styles.section}>
         <div className={styles.sectionTitle}>Treatment Plan Narrative</div>
         <p className={styles.hint}>
-          Record a voice description of the treatment plan in your own words.
+          Record or type a description of the treatment plan in your own words.
         </p>
-        <div className={styles.recordRow}>
-          {!isRecording ? (
-            <button
-              className={styles.recordBtn}
-              onClick={startRecording}
-              disabled={phase === "transcribing"}
-            >
-              Start Recording
-            </button>
-          ) : (
+        <div className={styles.inputModeRow}>
+          <button
+            className={styles.recordBtn}
+            onClick={startRecording}
+            disabled={phase === "transcribing" || isRecording}
+          >
+            {isRecording ? "Recording..." : "Record"}
+          </button>
+          {isRecording && (
             <>
               <button className={styles.stopBtn} onClick={stopRecording}>
-                Stop Recording
+                Stop ({formatDuration(recordDuration)})
               </button>
-              <span className={styles.timer}>
-                {formatDuration(recordDuration)}
-              </span>
             </>
           )}
         </div>
@@ -910,19 +906,16 @@ function NewEstimateInner() {
           <div className={styles.status}>Transcribing with Whisper...</div>
         )}
 
-        {transcript && (
-          <div className={styles.transcriptBox}>
-            <button
-              className={styles.transcriptToggle}
-              onClick={() => setShowTranscript(!showTranscript)}
-            >
-              {showTranscript ? "Hide Transcript" : "Show Transcript"}
-            </button>
-            {showTranscript && (
-              <div className={styles.transcriptText}>{transcript}</div>
-            )}
-          </div>
-        )}
+        <div className={styles.typeSection}>
+          <label className={styles.fieldLabel}>Or type / edit notes below:</label>
+          <textarea
+            className={styles.transcriptTextarea}
+            placeholder="Type your treatment plan notes here... or record above and edit the transcript."
+            value={transcript}
+            onChange={(e) => setTranscript(e.target.value)}
+            rows={6}
+          />
+        </div>
       </div>
 
       {/* ── 4. Refine Estimate ──────────────────────────────────── */}

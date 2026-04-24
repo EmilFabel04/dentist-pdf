@@ -1151,13 +1151,19 @@ function NewEstimateInner() {
             )}
           </div>
 
-          {phase !== "saved" && (
-            <div className={styles.downloadRow}>
+          <div className={styles.downloadRow}>
+            <button
+              className={styles.primaryBtn}
+              onClick={() => { setPdfBlob(null); setPhase("idle"); }}
+            >
+              Make Changes &amp; Regenerate
+            </button>
+            {phase !== "saved" && (
               <button className={styles.saveBtn} onClick={saveEstimate}>
                 Save Estimate
               </button>
-            </div>
-          )}
+            )}
+          </div>
 
           {phase === "saved" && selectedPatient && (
             <div className={styles.successMsg}>

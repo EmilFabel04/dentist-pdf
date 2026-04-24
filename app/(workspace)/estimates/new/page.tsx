@@ -1113,7 +1113,7 @@ function NewEstimateInner() {
         )}
 
       {/* ── 5. Generate & Download ──────────────────────────────── */}
-      {phase === "reviewing" && selectedTreatments.length > 0 && (
+      {selectedTreatments.length > 0 && phase !== "generating" && phase !== "done" && phase !== "saved" && (
         <div className={styles.section}>
           <button
             className={styles.primaryBtn}

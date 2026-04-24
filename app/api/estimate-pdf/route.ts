@@ -56,6 +56,7 @@ type DrawCtx = {
   settings: PracticeSettings;
   logoImage: PDFImage | null;
   toothGraphImage: PDFImage | null;
+  paymentImage: PDFImage | null;
 };
 
 // ── Utility: clean text for pdf-lib ─────────────────────────
@@ -112,6 +113,17 @@ export async function POST(request: Request) {
       console.warn("[estimate-pdf] Could not load tooth graph:", e);
     }
 
+    let paymentImage: PDFImage | null = null;
+    try {
+      const paymentPath = path.resolve(process.cwd(), "logo/payment.png");
+      if (fs.existsSync(paymentPath)) {
+        const paymentBytes = fs.readFileSync(paymentPath);
+        paymentImage = await doc.embedPng(paymentBytes);
+      }
+    } catch (e) {
+      console.warn("[estimate-pdf] Could not load payment image:", e);
+    }
+
     const ctx: DrawCtx = {
       doc,
       font,
@@ -123,6 +135,7 @@ export async function POST(request: Request) {
       settings,
       logoImage,
       toothGraphImage,
+      paymentImage,
     };
 
     // ================================================================
@@ -553,10 +566,6 @@ function drawPage2(
     opts;
   const { font, boldFont, italicFont, settings } = ctx;
 
-  // Small practice header on continuation pages
-  drawSmallHeader(ctx);
-  ctx.y -= 15;
-
   // ── 13. Third Party Fees section ──
   drawSectionHeading(ctx, "Third Party Fees");
   ctx.y -= 10;
@@ -828,48 +837,75 @@ function drawPage3(
   const { patientName, selectedTreatments } = opts;
   const { font, boldFont, italicFont, settings } = ctx;
 
-  // Small practice header
-  drawSmallHeader(ctx);
-  ctx.y -= 15;
-
   // ── 22. Treatment Type / What to Expect table ──
   drawSectionHeading(ctx, "Treatment Type / What to Expect and Aftercare");
   ctx.y -= 10;
 
-  const ttColWidths = [100, 340, 55];
-  const ttHeaders = ["Treatment Type", "What to Expect and Aftercare", "Initial"];
+  const ttColWidths = [90, 165, 165, 75];
+  const ttHeaders = ["Treatment Type", "What to Expect and Aftercare", "Terms and Conditions", "Warranty"];
 
   drawTableHeader(ctx, MARGIN_L, CONTENT_W, 16, ttHeaders, ttColWidths, true);
 
   // PPE row (always present)
-  const ppeDesc =
-    "Standard infection control and PPE protocols are followed for all treatments to ensure your safety.";
   drawTreatmentTypeRow(ctx, MARGIN_L, ttColWidths, {
     type: "PPE and Infection Control",
-    description: ppeDesc,
+    whatToExpect: "Standard infection control and PPE protocols are followed for all treatments to ensure your safety.",
+    termsAndConditions: "",
+    warranty: "",
   });
 
   // Dynamic rows from selected treatments
-  const treatmentTCs = new Map<string, string>();
+  const treatmentTCRows = new Map<string, { whatToExpect: string; termsAndConditions: string; warranty: string }>();
   for (const st of selectedTreatments) {
     if (st.treatment.termsAndConditions) {
-      const tcText = cleanText(
-        st.treatment.termsAndConditions.replace(/---/g, "").trim()
+      const displayName = formatCategoryName(
+        st.treatment.category || st.treatment.name
       );
-      const existingValues = [...treatmentTCs.values()];
-      if (!existingValues.some((v) => v === tcText)) {
-        const displayName = formatCategoryName(
-          st.treatment.category || st.treatment.name
-        );
-        treatmentTCs.set(displayName, tcText);
+      if (treatmentTCRows.has(displayName)) continue;
+
+      const rawTC = st.treatment.termsAndConditions.replace(/---/g, "").trim();
+
+      // Parse out warranty info (e.g. "Warranty: 3 years" or "Warranty: N/A")
+      let warranty = "";
+      const warrantyMatch = rawTC.match(/Warranty\s*:\s*([^\n.]+)/i);
+      if (warrantyMatch) {
+        warranty = warrantyMatch[1].trim();
       }
+
+      // Split into What to Expect and Terms and Conditions sections
+      let whatToExpect = "";
+      let termsText = "";
+
+      // Try to split on "Terms and Conditions" or "T&C" markers
+      const tcSplitRegex = /Terms\s+and\s+Conditions\s*:/i;
+      const parts = rawTC.split(tcSplitRegex);
+      if (parts.length >= 2) {
+        whatToExpect = parts[0].replace(/What\s+to\s+Expect\s*(and\s+Aftercare)?\s*:/i, "").trim();
+        termsText = parts[1].replace(/Warranty\s*:\s*[^\n.]*/i, "").trim();
+      } else {
+        // If no split marker, use the whole text as whatToExpect
+        whatToExpect = rawTC.replace(/Warranty\s*:\s*[^\n.]*/i, "").trim();
+        termsText = "";
+      }
+
+      // Remove trailing/leading punctuation artefacts
+      whatToExpect = whatToExpect.replace(/^[-\s]+|[-\s]+$/g, "").trim();
+      termsText = termsText.replace(/^[-\s]+|[-\s]+$/g, "").trim();
+
+      treatmentTCRows.set(displayName, {
+        whatToExpect: cleanText(whatToExpect),
+        termsAndConditions: cleanText(termsText),
+        warranty: cleanText(warranty),
+      });
     }
   }
 
-  for (const [category, tc] of treatmentTCs) {
+  for (const [category, data] of treatmentTCRows) {
     drawTreatmentTypeRow(ctx, MARGIN_L, ttColWidths, {
       type: category,
-      description: tc,
+      whatToExpect: data.whatToExpect,
+      termsAndConditions: data.termsAndConditions,
+      warranty: data.warranty,
     });
   }
 
@@ -982,11 +1018,20 @@ function drawPage3(
     ctx.y -= 13;
   }
 
+  // Left: Signature (italic placeholder)
+  ctx.page.drawText(cleanText("Sheryl Smithies"), {
+    x: leftX,
+    y: ctx.y + 40,
+    size: 14,
+    font: italicFont,
+    color: DARK,
+  });
+
   // Left: Doctor name
   const doctorName = cleanText(settings.name || "Dr Sheryl Smithies");
   ctx.page.drawText(doctorName, {
     x: leftX,
-    y: ctx.y + 30,
+    y: ctx.y + 24,
     size: 9,
     font: boldFont,
     color: DARK,
@@ -1000,6 +1045,25 @@ function drawPage3(
     font,
     color: DARK,
   });
+  ctx.y -= 20;
+
+  // ── 25. Payment image ──
+  if (ctx.paymentImage) {
+    const payDims = ctx.paymentImage.scale(0.4);
+    const payW = Math.min(payDims.width, CONTENT_W);
+    const payH = (payW / payDims.width) * payDims.height;
+
+    ensureSpace(ctx, payH + 15);
+    ctx.y -= 10;
+
+    ctx.page.drawImage(ctx.paymentImage, {
+      x: (PAGE_W - payW) / 2,
+      y: ctx.y - payH,
+      width: payW,
+      height: payH,
+    });
+    ctx.y -= payH + 10;
+  }
 }
 
 // ================================================================
@@ -1012,12 +1076,10 @@ function newPage(ctx: DrawCtx) {
   ctx.y = 790;
 }
 
-/** Ensure enough vertical space; if not, start a new page with a small header */
+/** Ensure enough vertical space; if not, start a new page */
 function ensureSpace(ctx: DrawCtx, needed: number) {
   if (ctx.y - needed < MARGIN_BOTTOM) {
     newPage(ctx);
-    drawSmallHeader(ctx);
-    ctx.y -= 15;
   }
 }
 
@@ -1027,8 +1089,8 @@ function drawPracticeHeader(ctx: DrawCtx) {
 
   // Logo image centered at top
   if (ctx.logoImage) {
-    const logoDims = ctx.logoImage.scale(0.15);
-    const logoW = Math.min(logoDims.width, 200);
+    const logoDims = ctx.logoImage.scale(0.25);
+    const logoW = Math.min(logoDims.width, 300);
     const logoH = (logoW / logoDims.width) * logoDims.height;
     ctx.page.drawImage(ctx.logoImage, {
       x: (PAGE_W - logoW) / 2,
@@ -1457,35 +1519,30 @@ function drawTreatmentRow(
   ctx.y -= rowH;
 }
 
-/** Draw a treatment type row with wrapped text */
+/** Draw a treatment type row with wrapped text (4-column layout) */
 function drawTreatmentTypeRow(
   ctx: DrawCtx,
   tableX: number,
   colWidths: number[],
-  data: { type: string; description: string }
+  data: { type: string; whatToExpect: string; termsAndConditions: string; warranty: string }
 ) {
   const { font, boldFont } = ctx;
-
-  // Calculate required row height based on content
-  const maxDescWidth = colWidths[1] - 8;
-  const maxTypeWidth = colWidths[0] - 8;
-  const descLines = wrapTextToLines(
-    cleanText(data.description),
-    maxDescWidth,
-    font,
-    6.5
-  );
-  const typeLines = wrapTextToLines(
-    cleanText(data.type),
-    maxTypeWidth,
-    boldFont,
-    7
-  );
   const lineH = 9;
-  const rowH = Math.max(
-    30,
-    Math.max(descLines.length, typeLines.length) * lineH + 12
-  );
+  const fontSize = 6;
+
+  // Calculate required row height based on content in each column
+  const maxTypeWidth = colWidths[0] - 8;
+  const maxExpectWidth = colWidths[1] - 8;
+  const maxTCWidth = colWidths[2] - 8;
+  const maxWarrantyWidth = colWidths[3] - 8;
+
+  const typeLines = wrapTextToLines(cleanText(data.type), maxTypeWidth, boldFont, 7);
+  const expectLines = wrapTextToLines(cleanText(data.whatToExpect), maxExpectWidth, font, fontSize);
+  const tcLines = wrapTextToLines(cleanText(data.termsAndConditions), maxTCWidth, font, fontSize);
+  const warrantyLines = wrapTextToLines(cleanText(data.warranty), maxWarrantyWidth, font, fontSize);
+
+  const maxLines = Math.max(typeLines.length, expectLines.length, tcLines.length, warrantyLines.length);
+  const rowH = Math.max(30, maxLines * lineH + 12);
 
   ensureSpace(ctx, rowH);
 
@@ -1511,7 +1568,7 @@ function drawTreatmentTypeRow(
     }
   }
 
-  // Treatment type (bold, left column)
+  // Col 1: Treatment type (bold)
   let typeY = rowY - 10;
   for (const line of typeLines) {
     ctx.page.drawText(line, {
@@ -1524,18 +1581,46 @@ function drawTreatmentTypeRow(
     typeY -= lineH;
   }
 
-  // Description (middle column, wrapped)
-  const descCol2X = tableX + colWidths[0];
-  let descY = rowY - 10;
-  for (const line of descLines) {
+  // Col 2: What to Expect and Aftercare
+  const col2X = tableX + colWidths[0];
+  let expectY = rowY - 10;
+  for (const line of expectLines) {
     ctx.page.drawText(line, {
-      x: descCol2X + 4,
-      y: descY,
-      size: 6.5,
+      x: col2X + 4,
+      y: expectY,
+      size: fontSize,
       font,
       color: DARK,
     });
-    descY -= lineH;
+    expectY -= lineH;
+  }
+
+  // Col 3: Terms and Conditions
+  const col3X = col2X + colWidths[1];
+  let tcY = rowY - 10;
+  for (const line of tcLines) {
+    ctx.page.drawText(line, {
+      x: col3X + 4,
+      y: tcY,
+      size: fontSize,
+      font,
+      color: DARK,
+    });
+    tcY -= lineH;
+  }
+
+  // Col 4: Warranty
+  const col4X = col3X + colWidths[2];
+  let warrantyY = rowY - 10;
+  for (const line of warrantyLines) {
+    ctx.page.drawText(line, {
+      x: col4X + 4,
+      y: warrantyY,
+      size: fontSize,
+      font,
+      color: DARK,
+    });
+    warrantyY -= lineH;
   }
 
   ctx.y -= rowH;

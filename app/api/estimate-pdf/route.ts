@@ -23,6 +23,7 @@ type Body = {
   discount?: number;
   appointmentCount?: number;
   basicCodes?: BasicCodeItem[];
+  transcript?: string;
 };
 
 // ── Colors ──────────────────────────────────────────────────
@@ -82,6 +83,7 @@ export async function POST(request: Request) {
       discount,
       appointmentCount = 1,
       basicCodes = [],
+      transcript = "",
     } = body;
 
     const doc = await PDFDocument.create();
@@ -161,6 +163,7 @@ export async function POST(request: Request) {
       appointmentCount,
       basicCodes,
       discount,
+      transcript,
     });
 
     // ================================================================
@@ -216,6 +219,7 @@ function drawPage1(
     appointmentCount: number;
     basicCodes: BasicCodeItem[];
     discount?: number;
+    transcript?: string;
   }
 ) {
   const {
@@ -225,8 +229,12 @@ function drawPage1(
     appointmentCount,
     basicCodes,
     discount,
+    transcript,
   } = opts;
   const { font, boldFont, italicFont, boldItalicFont, settings } = ctx;
+
+  // Parse appointment details from transcript
+  const appointmentDetails = parseAppointmentDetails(transcript || "", appointmentCount);
 
   // ── 1. Practice header (centered) ──
   drawPracticeHeader(ctx);
@@ -300,15 +308,43 @@ function drawPage1(
       drawVLine(ctx.page, divX, rowY + 4, apptRowH);
     }
 
-    // Text
-    const cellText = cleanText(`Appointment ${i + 1}`);
-    ctx.page.drawText(cellText, {
+    // Appointment label
+    ctx.page.drawText(cleanText(`Appointment ${i + 1}`), {
       x: MARGIN_L + 6,
       y: rowY - 11,
       size: 8,
       font,
       color: DARK,
     });
+
+    // Treatments description
+    const detail = appointmentDetails[i];
+    if (detail?.treatments) {
+      const treatText = truncateToWidth(
+        cleanText(detail.treatments), apptColWidths[1] - 12, font, 7
+      );
+      ctx.page.drawText(treatText, {
+        x: MARGIN_L + apptColWidths[0] + 6,
+        y: rowY - 11,
+        size: 7,
+        font,
+        color: DARK,
+      });
+    }
+
+    // Appointment length
+    if (detail?.length) {
+      const lenText = truncateToWidth(
+        cleanText(detail.length), apptColWidths[2] - 12, font, 7
+      );
+      ctx.page.drawText(lenText, {
+        x: MARGIN_L + apptColWidths[0] + apptColWidths[1] + 6,
+        y: rowY - 11,
+        size: 7,
+        font,
+        color: DARK,
+      });
+    }
 
     ctx.y -= apptRowH;
   }
@@ -1031,38 +1067,7 @@ function drawPage3(
     ctx.y -= 13;
   }
 
-  // Left: Signature image
-  if (ctx.signatureImage) {
-    const sigDims = ctx.signatureImage.scale(0.12);
-    const sigW = Math.min(sigDims.width, 150);
-    const sigH = (sigW / sigDims.width) * sigDims.height;
-    ctx.page.drawImage(ctx.signatureImage, {
-      x: leftX,
-      y: ctx.y + 20,
-      width: sigW,
-      height: sigH,
-    });
-  } else {
-    ctx.page.drawText(cleanText("Sheryl Smithies"), {
-      x: leftX,
-      y: ctx.y + 40,
-      size: 14,
-      font: italicFont,
-      color: DARK,
-    });
-  }
-
-  // Left: Doctor name
-  const doctorName = cleanText(settings.name || "Dr Sheryl Smithies");
-  ctx.page.drawText(doctorName, {
-    x: leftX,
-    y: ctx.y + 24,
-    size: 9,
-    font: boldFont,
-    color: DARK,
-  });
-
-  // SWIFT on right
+  // SWIFT on right (same line as last bank detail)
   ctx.page.drawText(cleanText("SWIFT: FIRNZAJJ"), {
     x: rightX,
     y: ctx.y,
@@ -1070,16 +1075,49 @@ function drawPage3(
     font,
     color: DARK,
   });
-  ctx.y -= 20;
+  ctx.y -= 25;
 
-  // ── 25. Payment image ──
+  // Left: Signature image ABOVE doctor name
+  if (ctx.signatureImage) {
+    const sigDims = ctx.signatureImage.scale(0.12);
+    const sigW = Math.min(sigDims.width, 150);
+    const sigH = (sigW / sigDims.width) * sigDims.height;
+    ctx.page.drawImage(ctx.signatureImage, {
+      x: leftX,
+      y: ctx.y - sigH,
+      width: sigW,
+      height: sigH,
+    });
+    ctx.y -= sigH + 5;
+  } else {
+    ctx.page.drawText(cleanText("Sheryl Smithies"), {
+      x: leftX,
+      y: ctx.y,
+      size: 14,
+      font: italicFont,
+      color: DARK,
+    });
+    ctx.y -= 18;
+  }
+
+  // Left: Doctor name below signature
+  const doctorName = cleanText(settings.name || "Dr Sheryl Smithies");
+  ctx.page.drawText(doctorName, {
+    x: leftX,
+    y: ctx.y,
+    size: 9,
+    font: boldFont,
+    color: DARK,
+  });
+  ctx.y -= 30;
+
+  // ── 25. Payment image (below everything) ──
   if (ctx.paymentImage) {
-    const payDims = ctx.paymentImage.scale(0.4);
-    const payW = Math.min(payDims.width, CONTENT_W);
+    const payDims = ctx.paymentImage.scale(0.35);
+    const payW = Math.min(payDims.width, 250);
     const payH = (payW / payDims.width) * payDims.height;
 
     ensureSpace(ctx, payH + 15);
-    ctx.y -= 10;
 
     ctx.page.drawImage(ctx.paymentImage, {
       x: (PAGE_W - payW) / 2,
@@ -1823,4 +1861,52 @@ function slug(s: string) {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "") || "patient"
   );
+}
+
+/** Parse appointment details from transcript text */
+function parseAppointmentDetails(
+  transcript: string,
+  count: number
+): { treatments: string; length: string }[] {
+  const results: { treatments: string; length: string }[] = [];
+
+  // Try to find "Appointment N:" patterns in the transcript
+  for (let i = 1; i <= count; i++) {
+    const patterns = [
+      new RegExp(`appointment\\s*${i}[:\\.]?\\s*(.+?)(?=appointment\\s*${i + 1}|$)`, "is"),
+      new RegExp(`visit\\s*${i}[:\\.]?\\s*(.+?)(?=visit\\s*${i + 1}|appointment|$)`, "is"),
+      new RegExp(`${ordinal(i)}\\s*(?:visit|appointment)[:\\.]?\\s*(.+?)(?=${ordinal(i + 1)}|appointment|visit|$)`, "is"),
+    ];
+
+    let content = "";
+    for (const pat of patterns) {
+      const m = transcript.match(pat);
+      if (m?.[1]) {
+        content = m[1].trim();
+        break;
+      }
+    }
+
+    // Extract appointment length if mentioned
+    let length = "";
+    const timeMatch = content.match(/(?:estimated\s+)?(?:appointment\s+)?length\s*[:\-]?\s*([\d.]+\s*(?:hour|hr|min)[s]?)/i)
+      || content.match(/([\d.]+\s*(?:hour|hr|min)[s]?)/i);
+    if (timeMatch) {
+      length = timeMatch[1];
+      content = content.replace(timeMatch[0], "").trim();
+    }
+
+    // Clean up the treatments text
+    content = content.replace(/[.]+$/, "").trim();
+
+    results.push({ treatments: content, length });
+  }
+
+  return results;
+}
+
+function ordinal(n: number): string {
+  const suffixes = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return n + (suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0]);
 }

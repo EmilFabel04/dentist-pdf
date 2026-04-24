@@ -617,6 +617,7 @@ function NewEstimateInner() {
         },
         appointmentCount,
         basicCodes,
+        transcript,
       });
 
       const requestHeaders = {

@@ -36,7 +36,7 @@ export default function LoginPage() {
   return (
     <main className={styles.main}>
       <div className={styles.card}>
-        <div className={styles.logoBox}>LOGO</div>
+        <img src="/enamel-clinic.svg" alt="Enamel Clinic" className={styles.logo} />
         <h1 className={styles.title}>Sign In</h1>
         <p className={styles.subtitle}>Dental Consultation Reports</p>
         <form onSubmit={handleSubmit}>

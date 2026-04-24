@@ -30,8 +30,8 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
     <div className={styles.container}>
       <aside className={styles.sidebar}>
         <div className={styles.logo}>
-          <Link href="/dashboard" style={{ color: "inherit", textDecoration: "none" }}>
-            DentistPDF
+          <Link href="/dashboard" style={{ textDecoration: "none" }}>
+            <img src="/enamel-clinic.svg" alt="Enamel Clinic" style={{ width: 140, height: "auto" }} />
           </Link>
         </div>
         <nav>

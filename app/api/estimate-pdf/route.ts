@@ -57,6 +57,7 @@ type DrawCtx = {
   logoImage: PDFImage | null;
   toothGraphImage: PDFImage | null;
   paymentImage: PDFImage | null;
+  signatureImage: PDFImage | null;
 };
 
 // ── Utility: clean text for pdf-lib ─────────────────────────
@@ -124,6 +125,17 @@ export async function POST(request: Request) {
       console.warn("[estimate-pdf] Could not load payment image:", e);
     }
 
+    let signatureImage: PDFImage | null = null;
+    try {
+      const sigPath = path.resolve(process.cwd(), "logo/signature.png");
+      if (fs.existsSync(sigPath)) {
+        const sigBytes = fs.readFileSync(sigPath);
+        signatureImage = await doc.embedPng(sigBytes);
+      }
+    } catch (e) {
+      console.warn("[estimate-pdf] Could not load signature image:", e);
+    }
+
     const ctx: DrawCtx = {
       doc,
       font,
@@ -136,6 +148,7 @@ export async function POST(request: Request) {
       logoImage,
       toothGraphImage,
       paymentImage,
+      signatureImage,
     };
 
     // ================================================================
@@ -1018,14 +1031,26 @@ function drawPage3(
     ctx.y -= 13;
   }
 
-  // Left: Signature (italic placeholder)
-  ctx.page.drawText(cleanText("Sheryl Smithies"), {
-    x: leftX,
-    y: ctx.y + 40,
-    size: 14,
-    font: italicFont,
-    color: DARK,
-  });
+  // Left: Signature image
+  if (ctx.signatureImage) {
+    const sigDims = ctx.signatureImage.scale(0.12);
+    const sigW = Math.min(sigDims.width, 150);
+    const sigH = (sigW / sigDims.width) * sigDims.height;
+    ctx.page.drawImage(ctx.signatureImage, {
+      x: leftX,
+      y: ctx.y + 20,
+      width: sigW,
+      height: sigH,
+    });
+  } else {
+    ctx.page.drawText(cleanText("Sheryl Smithies"), {
+      x: leftX,
+      y: ctx.y + 40,
+      size: 14,
+      font: italicFont,
+      color: DARK,
+    });
+  }
 
   // Left: Doctor name
   const doctorName = cleanText(settings.name || "Dr Sheryl Smithies");

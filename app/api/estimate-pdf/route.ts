@@ -1018,13 +1018,13 @@ function drawPage3(
 
   let leftY = startY - 20;
 
-  // Signature image
+  // Signature image — flush left, no indent
   if (ctx.signatureImage) {
-    const sigDims = ctx.signatureImage.scale(0.1);
-    const sigW = Math.min(sigDims.width, 130);
+    const sigDims = ctx.signatureImage.scale(0.08);
+    const sigW = Math.min(sigDims.width, 120);
     const sigH = (sigW / sigDims.width) * sigDims.height;
     ctx.page.drawImage(ctx.signatureImage, {
-      x: leftX,
+      x: leftX - 5,
       y: leftY - sigH,
       width: sigW,
       height: sigH,
@@ -1090,16 +1090,16 @@ function drawPage3(
   // Move ctx.y to below whichever side went lower
   ctx.y = Math.min(leftY, rightY) - 20;
 
-  // ── 25. Payment image (below everything, centered) ──
+  // ── 25. Payment image (right-aligned, under banking details) ──
   if (ctx.paymentImage) {
-    const payDims = ctx.paymentImage.scale(0.3);
-    const payW = Math.min(payDims.width, 200);
+    const payDims = ctx.paymentImage.scale(0.25);
+    const payW = Math.min(payDims.width, 180);
     const payH = (payW / payDims.width) * payDims.height;
 
     ensureSpace(ctx, payH + 10);
 
     ctx.page.drawImage(ctx.paymentImage, {
-      x: (PAGE_W - payW) / 2,
+      x: rightX,
       y: ctx.y - payH,
       width: payW,
       height: payH,

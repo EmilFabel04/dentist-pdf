@@ -646,15 +646,11 @@ function drawPage2(
   let thirdPartyTotal = 0;
   let rowIndex = 0;
 
-  // Categories that typically need lab work
-  const labCategories = ["crown", "bridge", "prosthodontic", "orthodontic"];
-  const labFeeAdded = new Set<string>();
-
   for (const st of selectedTreatments) {
     for (const sc of st.selectedCodes) {
       const matchingCode = st.treatment.codes.find((c) => c.code === sc.code);
 
-      // Check explicit labFee on the code
+      // Only show lab fees that actually have amounts
       if (matchingCode?.labFee && matchingCode.labFee > 0) {
         ensureSpace(ctx, rowH);
         const lineTotal = matchingCode.labFee * sc.quantity;
@@ -670,10 +666,9 @@ function drawPage2(
           total: fmtR(lineTotal),
         });
         rowIndex++;
-        labFeeAdded.add(sc.code);
       }
 
-      // Check explicit implantFee
+      // Only show implant fees that actually have amounts
       if (matchingCode?.implantFee && matchingCode.implantFee > 0) {
         ensureSpace(ctx, rowH);
         const lineTotal = matchingCode.implantFee * sc.quantity;
@@ -689,27 +684,6 @@ function drawPage2(
           total: fmtR(lineTotal),
         });
         rowIndex++;
-      }
-
-      // Auto-add estimated lab fee for crown/bridge/prosthodontic if not already added
-      if (
-        labCategories.includes(st.treatment.category) &&
-        !labFeeAdded.has(sc.code) &&
-        !(matchingCode?.labFee && matchingCode.labFee > 0)
-      ) {
-        ensureSpace(ctx, rowH);
-        drawTreatmentRow(ctx, treatColX, treatColWidths, rowH, rowIndex, {
-          code: "8099",
-          desc: `Lab fee, approx. NOT FINAL AMOUNT - ${sc.description}`,
-          icd10: "",
-          provider: "Lab",
-          toothNumbers: "",
-          unitPrice: "TBC",
-          units: String(sc.quantity),
-          total: "TBC",
-        });
-        rowIndex++;
-        labFeeAdded.add(sc.code);
       }
     }
   }
@@ -1037,111 +1011,103 @@ function drawPage3(
   );
   ctx.y -= 35;
 
-  // ── 24. Bottom section: Kind Regards + Banking Details ──
-  ensureSpace(ctx, 120);
+  // ── 24. Bottom section: Kind Regards + Signature + Banking ──
+  ensureSpace(ctx, 140);
 
   const leftX = MARGIN_L;
-  const rightX = PAGE_W / 2 + 40;
+  const rightX = PAGE_W / 2 + 20;
+  const startY = ctx.y;
 
-  // Left: Kind Regards
+  // ── LEFT SIDE: Kind Regards + Signature + Doctor Name ──
   ctx.page.drawText(cleanText("Kind Regards,"), {
     x: leftX,
-    y: ctx.y,
+    y: startY,
     size: 9,
     font,
     color: DARK,
   });
 
-  // Right: Banking Details
-  ctx.page.drawText(
-    cleanText("Banking Details for EFT payments:"),
-    {
-      x: rightX,
-      y: ctx.y,
-      size: 9,
-      font: boldFont,
-      color: DARK,
-    }
-  );
-  ctx.y -= 16;
+  let leftY = startY - 20;
 
+  // Signature image
+  if (ctx.signatureImage) {
+    const sigDims = ctx.signatureImage.scale(0.1);
+    const sigW = Math.min(sigDims.width, 130);
+    const sigH = (sigW / sigDims.width) * sigDims.height;
+    ctx.page.drawImage(ctx.signatureImage, {
+      x: leftX,
+      y: leftY - sigH,
+      width: sigW,
+      height: sigH,
+    });
+    leftY -= sigH + 6;
+  } else {
+    ctx.page.drawText(cleanText("Sheryl Smithies"), {
+      x: leftX,
+      y: leftY,
+      size: 14,
+      font: italicFont,
+      color: DARK,
+    });
+    leftY -= 18;
+  }
+
+  // Doctor name
+  ctx.page.drawText(cleanText(settings.name || "Dr Sheryl Smithies"), {
+    x: leftX,
+    y: leftY,
+    size: 9,
+    font: boldFont,
+    color: DARK,
+  });
+
+  // ── RIGHT SIDE: Banking Details ──
+  ctx.page.drawText(cleanText("Banking Details for EFT payments:"), {
+    x: rightX,
+    y: startY,
+    size: 9,
+    font: boldFont,
+    color: DARK,
+  });
+
+  let rightY = startY - 16;
   const bankDetails = [
     ["Bank:", "FNB"],
     ["Branch code:", "255655"],
     ["Acc Name:", "The Smile Emporium INC"],
     ["Acc no:", "62695604176"],
     ["Ref:", "Your name and surname"],
+    ["SWIFT:", "FIRNZAJJ"],
   ];
 
   for (const [label, value] of bankDetails) {
     ctx.page.drawText(cleanText(label), {
       x: rightX,
-      y: ctx.y,
+      y: rightY,
       size: 8,
       font,
       color: DARK,
     });
     ctx.page.drawText(cleanText(value), {
       x: rightX + 75,
-      y: ctx.y,
+      y: rightY,
       size: 8,
       font,
       color: DARK,
     });
-    ctx.y -= 13;
+    rightY -= 13;
   }
 
-  // SWIFT on right (same line as last bank detail)
-  ctx.page.drawText(cleanText("SWIFT: FIRNZAJJ"), {
-    x: rightX,
-    y: ctx.y,
-    size: 8,
-    font,
-    color: DARK,
-  });
-  ctx.y -= 25;
+  // Move ctx.y to below whichever side went lower
+  ctx.y = Math.min(leftY, rightY) - 20;
 
-  // Left: Signature image ABOVE doctor name
-  if (ctx.signatureImage) {
-    const sigDims = ctx.signatureImage.scale(0.12);
-    const sigW = Math.min(sigDims.width, 150);
-    const sigH = (sigW / sigDims.width) * sigDims.height;
-    ctx.page.drawImage(ctx.signatureImage, {
-      x: leftX,
-      y: ctx.y - sigH,
-      width: sigW,
-      height: sigH,
-    });
-    ctx.y -= sigH + 5;
-  } else {
-    ctx.page.drawText(cleanText("Sheryl Smithies"), {
-      x: leftX,
-      y: ctx.y,
-      size: 14,
-      font: italicFont,
-      color: DARK,
-    });
-    ctx.y -= 18;
-  }
-
-  // Left: Doctor name below signature
-  const doctorName = cleanText(settings.name || "Dr Sheryl Smithies");
-  ctx.page.drawText(doctorName, {
-    x: leftX,
-    y: ctx.y,
-    size: 9,
-    font: boldFont,
-    color: DARK,
-  });
-  ctx.y -= 30;
-
-  // ── 25. Payment image (below everything) ──
+  // ── 25. Payment image (below everything, centered) ──
   if (ctx.paymentImage) {
-    const payDims = ctx.paymentImage.scale(0.35);
-    const payW = Math.min(payDims.width, 250);
+    const payDims = ctx.paymentImage.scale(0.3);
+    const payW = Math.min(payDims.width, 200);
     const payH = (payW / payDims.width) * payDims.height;
 
-    ensureSpace(ctx, payH + 15);
+    ensureSpace(ctx, payH + 10);
 
     ctx.page.drawImage(ctx.paymentImage, {
       x: (PAGE_W - payW) / 2,

@@ -646,46 +646,70 @@ function drawPage2(
   let thirdPartyTotal = 0;
   let rowIndex = 0;
 
+  // Categories that typically need lab work
+  const labCategories = ["crown", "bridge", "prosthodontic", "orthodontic"];
+  const labFeeAdded = new Set<string>();
+
   for (const st of selectedTreatments) {
     for (const sc of st.selectedCodes) {
       const matchingCode = st.treatment.codes.find((c) => c.code === sc.code);
+
+      // Check explicit labFee on the code
+      if (matchingCode?.labFee && matchingCode.labFee > 0) {
+        ensureSpace(ctx, rowH);
+        const lineTotal = matchingCode.labFee * sc.quantity;
+        thirdPartyTotal += lineTotal;
+        drawTreatmentRow(ctx, treatColX, treatColWidths, rowH, rowIndex, {
+          code: "8099",
+          desc: `Lab fee - ${sc.description}`,
+          icd10: "",
+          provider: "Lab",
+          toothNumbers: "",
+          unitPrice: fmtR(matchingCode.labFee),
+          units: String(sc.quantity),
+          total: fmtR(lineTotal),
+        });
+        rowIndex++;
+        labFeeAdded.add(sc.code);
+      }
+
+      // Check explicit implantFee
+      if (matchingCode?.implantFee && matchingCode.implantFee > 0) {
+        ensureSpace(ctx, rowH);
+        const lineTotal = matchingCode.implantFee * sc.quantity;
+        thirdPartyTotal += lineTotal;
+        drawTreatmentRow(ctx, treatColX, treatColWidths, rowH, rowIndex, {
+          code: sc.code,
+          desc: `Implant component - ${sc.description}`,
+          icd10: "",
+          provider: "Supplier",
+          toothNumbers: "",
+          unitPrice: fmtR(matchingCode.implantFee),
+          units: String(sc.quantity),
+          total: fmtR(lineTotal),
+        });
+        rowIndex++;
+      }
+
+      // Auto-add estimated lab fee for crown/bridge/prosthodontic if not already added
       if (
-        matchingCode &&
-        ((matchingCode.labFee && matchingCode.labFee > 0) ||
-          (matchingCode.implantFee && matchingCode.implantFee > 0))
+        labCategories.includes(st.treatment.category) &&
+        !labFeeAdded.has(sc.code) &&
+        !(matchingCode?.labFee && matchingCode.labFee > 0)
       ) {
-        if (matchingCode.labFee && matchingCode.labFee > 0) {
-          ensureSpace(ctx, rowH);
-          const lineTotal = matchingCode.labFee * sc.quantity;
-          thirdPartyTotal += lineTotal;
-          drawTreatmentRow(ctx, treatColX, treatColWidths, rowH, rowIndex, {
-            code: sc.code,
-            desc: `Lab fee - ${sc.description}`,
-            icd10: "",
-            provider: "Lab",
-            toothNumbers: "",
-            unitPrice: fmtR(matchingCode.labFee),
-            units: String(sc.quantity),
-            total: fmtR(lineTotal),
-          });
-          rowIndex++;
-        }
-        if (matchingCode.implantFee && matchingCode.implantFee > 0) {
-          ensureSpace(ctx, rowH);
-          const lineTotal = matchingCode.implantFee * sc.quantity;
-          thirdPartyTotal += lineTotal;
-          drawTreatmentRow(ctx, treatColX, treatColWidths, rowH, rowIndex, {
-            code: sc.code,
-            desc: `Implant - ${sc.description}`,
-            icd10: "",
-            provider: "Supplier",
-            toothNumbers: "",
-            unitPrice: fmtR(matchingCode.implantFee),
-            units: String(sc.quantity),
-            total: fmtR(lineTotal),
-          });
-          rowIndex++;
-        }
+        ensureSpace(ctx, rowH);
+        drawTreatmentRow(ctx, treatColX, treatColWidths, rowH, rowIndex, {
+          code: "8099",
+          desc: `Lab fee, approx. NOT FINAL AMOUNT - ${sc.description}`,
+          icd10: "",
+          provider: "Lab",
+          toothNumbers: "",
+          unitPrice: "TBC",
+          units: String(sc.quantity),
+          total: "TBC",
+        });
+        rowIndex++;
+        labFeeAdded.add(sc.code);
       }
     }
   }

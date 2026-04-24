@@ -934,13 +934,13 @@ function NewReportInner() {
       </div>
 
       {/* ── 6. Generate Report ──────────────────────────────────── */}
-      {transcript && !report && (
+      {!report && (
         <div className={styles.section}>
           <button
             className={styles.primaryBtn}
             onClick={generateReport}
             disabled={
-              !selectedPatient || !transcript || phase === "generating"
+              !selectedPatient || !transcript.trim() || phase === "generating"
             }
           >
             {phase === "generating"

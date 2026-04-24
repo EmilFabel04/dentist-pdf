@@ -24,6 +24,7 @@ type Body = {
   appointmentCount?: number;
   basicCodes?: BasicCodeItem[];
   transcript?: string;
+  labFees?: { description: string; amount: number }[];
 };
 
 // ── Colors ──────────────────────────────────────────────────
@@ -84,6 +85,7 @@ export async function POST(request: Request) {
       appointmentCount = 1,
       basicCodes = [],
       transcript = "",
+      labFees = [],
     } = body;
 
     const doc = await PDFDocument.create();
@@ -176,6 +178,7 @@ export async function POST(request: Request) {
       basicCodes,
       appointmentCount,
       discount,
+      labFees,
     });
 
     // ================================================================
@@ -609,9 +612,10 @@ function drawPage2(
     basicCodes: BasicCodeItem[];
     appointmentCount: number;
     discount?: number;
+    labFees?: { description: string; amount: number }[];
   }
 ) {
-  const { patientName, selectedTreatments, basicCodes, appointmentCount, discount } =
+  const { patientName, selectedTreatments, basicCodes, appointmentCount, discount, labFees = [] } =
     opts;
   const { font, boldFont, italicFont, settings } = ctx;
 
@@ -685,6 +689,25 @@ function drawPage2(
         });
         rowIndex++;
       }
+    }
+  }
+
+  // Manual lab fees from the UI
+  for (const lf of labFees) {
+    if (lf.amount > 0) {
+      ensureSpace(ctx, rowH);
+      thirdPartyTotal += lf.amount;
+      drawTreatmentRow(ctx, treatColX, treatColWidths, rowH, rowIndex, {
+        code: "8099",
+        desc: cleanText(lf.description || "Lab fee"),
+        icd10: "",
+        provider: "Lab",
+        toothNumbers: "",
+        unitPrice: fmtR(lf.amount),
+        units: "1",
+        total: fmtR(lf.amount),
+      });
+      rowIndex++;
     }
   }
 

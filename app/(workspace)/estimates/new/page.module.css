@@ -773,3 +773,72 @@
   font-size: 0.8rem;
   cursor: pointer;
 }
+
+/* ── Lab Fees ─────────────────────────────────────────────── */
+
+.labFeeRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.labFeeDesc {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #d0d5dd;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.labFeeDesc:focus {
+  border-color: #579158;
+  outline: none;
+}
+
+.labFeeAmount {
+  width: 100px;
+  padding: 6px 10px;
+  border: 1px solid #d0d5dd;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  text-align: right;
+}
+
+.labFeeAmount:focus {
+  border-color: #579158;
+  outline: none;
+}
+
+.labFeeRemove {
+  padding: 4px 8px;
+  border: none;
+  background: none;
+  color: #da1e28;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.addLabFeeBtn {
+  padding: 6px 12px;
+  border: 1px dashed #579158;
+  background: none;
+  color: #579158;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.addLabFeeBtn:hover {
+  background: #e8f5e9;
+}
+
+.labFeeTotal {
+  margin-top: 8px;
+  text-align: right;
+  font-weight: 600;
+  color: #333;
+}

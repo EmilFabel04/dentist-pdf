@@ -52,6 +52,10 @@ function NewEstimateInner() {
   const [showSavePreset, setShowSavePreset] = useState(false);
   const [presetName, setPresetName] = useState("");
 
+  // Lab fees (third party)
+  type LabFeeItem = { description: string; amount: number };
+  const [labFees, setLabFees] = useState<LabFeeItem[]>([]);
+
   // Recording
   const [phase, setPhase] = useState<Phase>("idle");
   const [isRecording, setIsRecording] = useState(false);
@@ -618,6 +622,7 @@ function NewEstimateInner() {
         appointmentCount,
         basicCodes,
         transcript,
+        labFees,
       });
 
       const requestHeaders = {
@@ -995,6 +1000,58 @@ function NewEstimateInner() {
           </>
         )}
       </div>
+
+      {/* ── Lab Fees (Third Party) ─────────────────────────────── */}
+      {selectedTreatments.length > 0 && (
+        <div className={styles.section}>
+          <div className={styles.sectionTitle}>Third Party / Lab Fees</div>
+          <p className={styles.hint}>
+            Add lab fees for treatments that require laboratory work (e.g. crowns, bridges, dentures).
+          </p>
+          {labFees.map((lf, i) => (
+            <div key={i} className={styles.labFeeRow}>
+              <input
+                className={styles.labFeeDesc}
+                placeholder="e.g. Lab fee - Ceramic crown"
+                value={lf.description}
+                onChange={(e) => {
+                  const updated = [...labFees];
+                  updated[i] = { ...lf, description: e.target.value };
+                  setLabFees(updated);
+                }}
+              />
+              <input
+                className={styles.labFeeAmount}
+                type="number"
+                placeholder="Amount"
+                value={lf.amount || ""}
+                onChange={(e) => {
+                  const updated = [...labFees];
+                  updated[i] = { ...lf, amount: parseFloat(e.target.value) || 0 };
+                  setLabFees(updated);
+                }}
+              />
+              <button
+                className={styles.labFeeRemove}
+                onClick={() => setLabFees(labFees.filter((_, j) => j !== i))}
+              >
+                x
+              </button>
+            </div>
+          ))}
+          <button
+            className={styles.addLabFeeBtn}
+            onClick={() => setLabFees([...labFees, { description: "", amount: 0 }])}
+          >
+            + Add Lab Fee
+          </button>
+          {labFees.length > 0 && (
+            <div className={styles.labFeeTotal}>
+              Lab Fees Total: R {labFees.reduce((s, l) => s + l.amount, 0).toFixed(2)}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── 3. Treatment Plan Notes (Record or Type) ──────────────── */}
       <div className={styles.section}>

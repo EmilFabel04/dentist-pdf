@@ -1,6 +1,8 @@
-import { PDFDocument, StandardFonts, rgb, PDFPage, PDFFont, RGB } from "pdf-lib";
+import { PDFDocument, StandardFonts, rgb, PDFPage, PDFFont, RGB, PDFImage } from "pdf-lib";
 import { verifyAuth } from "@/lib/firebase";
 import type { SelectedTreatment, PracticeSettings } from "@/lib/types";
+import * as fs from "fs";
+import * as path from "path";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -52,6 +54,8 @@ type DrawCtx = {
   page: PDFPage;
   y: number;
   settings: PracticeSettings;
+  logoImage: PDFImage | null;
+  toothGraphImage: PDFImage | null;
 };
 
 // ── Utility: clean text for pdf-lib ─────────────────────────
@@ -86,6 +90,28 @@ export async function POST(request: Request) {
       StandardFonts.HelveticaBoldOblique
     );
 
+    // Load logo and tooth graph images
+    let logoImage: PDFImage | null = null;
+    let toothGraphImage: PDFImage | null = null;
+    try {
+      const logoPath = path.resolve(process.cwd(), "logo/enamel-clinic.png");
+      if (fs.existsSync(logoPath)) {
+        const logoBytes = fs.readFileSync(logoPath);
+        logoImage = await doc.embedPng(logoBytes);
+      }
+    } catch (e) {
+      console.warn("[estimate-pdf] Could not load logo:", e);
+    }
+    try {
+      const toothPath = path.resolve(process.cwd(), "logo/tooth-graph.png");
+      if (fs.existsSync(toothPath)) {
+        const toothBytes = fs.readFileSync(toothPath);
+        toothGraphImage = await doc.embedPng(toothBytes);
+      }
+    } catch (e) {
+      console.warn("[estimate-pdf] Could not load tooth graph:", e);
+    }
+
     const ctx: DrawCtx = {
       doc,
       font,
@@ -95,6 +121,8 @@ export async function POST(request: Request) {
       page: doc.addPage([PAGE_W, PAGE_H]),
       y: 790,
       settings,
+      logoImage,
+      toothGraphImage,
     };
 
     // ================================================================
@@ -997,6 +1025,20 @@ function ensureSpace(ctx: DrawCtx, needed: number) {
 function drawPracticeHeader(ctx: DrawCtx) {
   const { boldFont, font, settings } = ctx;
 
+  // Logo image centered at top
+  if (ctx.logoImage) {
+    const logoDims = ctx.logoImage.scale(0.15);
+    const logoW = Math.min(logoDims.width, 200);
+    const logoH = (logoW / logoDims.width) * logoDims.height;
+    ctx.page.drawImage(ctx.logoImage, {
+      x: (PAGE_W - logoW) / 2,
+      y: ctx.y - logoH + 10,
+      width: logoW,
+      height: logoH,
+    });
+    ctx.y -= logoH + 8;
+  }
+
   // Practice name - 13pt bold green centered
   const practiceName = cleanText(
     settings.name || "Dr Sheryl Smithies BChD (PRET)"
@@ -1499,13 +1541,32 @@ function drawTreatmentTypeRow(
   ctx.y -= rowH;
 }
 
-/** Draw tooth diagram labels */
+/** Draw tooth diagram */
 function drawToothDiagramLabels(ctx: DrawCtx) {
-  const { font, boldFont, italicFont } = ctx;
+  const { font, italicFont } = ctx;
 
+  // If we have the tooth graph image, use it
+  if (ctx.toothGraphImage) {
+    const imgDims = ctx.toothGraphImage.scale(0.5);
+    const imgW = Math.min(imgDims.width, CONTENT_W);
+    const imgH = (imgW / imgDims.width) * imgDims.height;
+
+    ensureSpace(ctx, imgH + 30);
+    drawSectionHeading(ctx, "Tooth Diagram");
+    ctx.y -= 5;
+
+    ctx.page.drawImage(ctx.toothGraphImage, {
+      x: (PAGE_W - imgW) / 2,
+      y: ctx.y - imgH,
+      width: imgW,
+      height: imgH,
+    });
+    ctx.y -= imgH + 10;
+    return;
+  }
+
+  // Fallback: draw tooth number labels
   ensureSpace(ctx, 55);
-
-  // Title
   drawSectionHeading(ctx, "Tooth Diagram");
   ctx.y -= 10;
 
@@ -1517,7 +1578,6 @@ function drawToothDiagramLabels(ctx: DrawCtx) {
   const centerX = PAGE_W / 2;
   const spacing = 26;
 
-  // "Patient's Right" label
   ctx.page.drawText(cleanText("Patient's Right"), {
     x: MARGIN_L,
     y: ctx.y + 6,
@@ -1526,7 +1586,6 @@ function drawToothDiagramLabels(ctx: DrawCtx) {
     color: GRAY,
   });
 
-  // "Patient's Left" label
   const plText = cleanText("Patient's Left");
   const plW = italicFont.widthOfTextAtSize(plText, 7);
   ctx.page.drawText(plText, {
@@ -1537,7 +1596,6 @@ function drawToothDiagramLabels(ctx: DrawCtx) {
     color: GRAY,
   });
 
-  // Upper row
   for (let i = 0; i < upperRight.length; i++) {
     const x = centerX - (i + 1) * spacing + spacing / 2;
     ctx.page.drawText(String(upperRight[i]), {

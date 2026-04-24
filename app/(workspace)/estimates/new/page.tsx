@@ -9,6 +9,7 @@ import type {
   Treatment,
   SelectedTreatment,
   PracticeSettings,
+  TreatmentPreset,
 } from "@/lib/types";
 import styles from "./page.module.css";
 
@@ -45,6 +46,11 @@ function NewEstimateInner() {
   const [allTreatments, setAllTreatments] = useState<Treatment[]>([]);
   const [selectedTreatments, setSelectedTreatments] = useState<SelectedTreatment[]>([]);
   const [treatmentSearch, setTreatmentSearch] = useState("");
+
+  // Presets
+  const [presets, setPresets] = useState<TreatmentPreset[]>([]);
+  const [showSavePreset, setShowSavePreset] = useState(false);
+  const [presetName, setPresetName] = useState("");
 
   // Recording
   const [phase, setPhase] = useState<Phase>("idle");
@@ -101,11 +107,14 @@ function NewEstimateInner() {
     (async () => {
       const token = await getToken();
       if (!token) return;
-      const [treatRes, settingsRes] = await Promise.all([
+      const [treatRes, settingsRes, presetsRes] = await Promise.all([
         fetch("/api/admin/treatments", {
           headers: { Authorization: `Bearer ${token}` },
         }),
         fetch("/api/admin/settings", {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch("/api/presets", {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
@@ -116,6 +125,10 @@ function NewEstimateInner() {
       if (settingsRes.ok) {
         const data: PracticeSettings = await settingsRes.json();
         setPracticeSettings(data);
+      }
+      if (presetsRes.ok) {
+        const data: TreatmentPreset[] = await presetsRes.json();
+        setPresets(data);
       }
     })();
   }, [getToken]);
@@ -241,6 +254,64 @@ function NewEstimateInner() {
     setSelectedTreatments((prev) =>
       prev.filter((st) => st.treatment.id !== treatmentId)
     );
+  }
+
+  /* ── Presets ─────────────────────────────────────────────── */
+
+  function applyPreset(preset: TreatmentPreset) {
+    const toAdd: SelectedTreatment[] = [];
+    for (const tid of preset.treatmentIds) {
+      const treatment = allTreatments.find((t) => t.id === tid);
+      if (treatment && !selectedTreatments.some((st) => st.treatment.id === tid)) {
+        toAdd.push({
+          treatment,
+          selectedCodes: treatment.codes.map((c) => ({
+            code: c.code,
+            description: c.description,
+            price: c.price,
+            quantity: 1,
+          })),
+        });
+      }
+    }
+    if (toAdd.length > 0) {
+      setSelectedTreatments((prev) => [...prev, ...toAdd]);
+    }
+  }
+
+  async function savePreset() {
+    if (!presetName.trim() || selectedTreatments.length === 0) return;
+    const token = await getToken();
+    if (!token) return;
+    const res = await fetch("/api/presets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        name: presetName.trim(),
+        treatmentIds: selectedTreatments.map((st) => st.treatment.id),
+      }),
+    });
+    if (res.ok) {
+      const { id } = await res.json();
+      setPresets((prev) => [...prev, {
+        id,
+        name: presetName.trim(),
+        treatmentIds: selectedTreatments.map((st) => st.treatment.id),
+        createdAt: new Date().toISOString(),
+      }]);
+      setPresetName("");
+      setShowSavePreset(false);
+    }
+  }
+
+  async function deletePreset(presetId: string) {
+    const token = await getToken();
+    if (!token) return;
+    await fetch(`/api/presets/${presetId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    setPresets((prev) => prev.filter((p) => p.id !== presetId));
   }
 
   function updateQuantity(treatmentId: string, code: string, qty: number) {
@@ -733,6 +804,32 @@ function NewEstimateInner() {
       {/* ── 2. Treatment Selection ──────────────────────────────── */}
       <div className={styles.section}>
         <div className={styles.sectionTitle}>Treatment Selection</div>
+
+        {/* Presets */}
+        {presets.length > 0 && (
+          <div className={styles.presetsRow}>
+            <span className={styles.presetsLabel}>Presets:</span>
+            {presets.map((p) => (
+              <div key={p.id} className={styles.presetChip}>
+                <button
+                  className={styles.presetBtn}
+                  onClick={() => applyPreset(p)}
+                  title={`Apply "${p.name}" (${p.treatmentIds.length} treatments)`}
+                >
+                  {p.name}
+                </button>
+                <button
+                  className={styles.presetDeleteBtn}
+                  onClick={() => deletePreset(p.id)}
+                  title="Delete preset"
+                >
+                  x
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         <input
           className={styles.treatmentSearch}
           type="text"
@@ -767,8 +864,37 @@ function NewEstimateInner() {
         {/* Selected treatments */}
         {selectedTreatments.length > 0 && (
           <div className={styles.selectedTreatments}>
-            <div className={styles.selectedTitle}>
-              Selected Treatments ({selectedTreatments.length})
+            <div className={styles.selectedHeader}>
+              <div className={styles.selectedTitle}>
+                Selected Treatments ({selectedTreatments.length})
+              </div>
+              {!showSavePreset ? (
+                <button
+                  className={styles.savePresetBtn}
+                  onClick={() => setShowSavePreset(true)}
+                >
+                  Save as Preset
+                </button>
+              ) : (
+                <div className={styles.savePresetForm}>
+                  <input
+                    className={styles.presetNameInput}
+                    placeholder="Preset name..."
+                    value={presetName}
+                    onChange={(e) => setPresetName(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && savePreset()}
+                  />
+                  <button className={styles.presetSaveConfirm} onClick={savePreset}>
+                    Save
+                  </button>
+                  <button
+                    className={styles.presetSaveCancel}
+                    onClick={() => { setShowSavePreset(false); setPresetName(""); }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
             </div>
             {selectedTreatments.map((st) => (
               <div key={st.treatment.id} className={styles.treatmentCard}>

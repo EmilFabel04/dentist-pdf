@@ -106,6 +106,13 @@ export type PatientReport = {
   createdAt: string;
 };
 
+export type TreatmentPreset = {
+  id: string;
+  name: string;
+  treatmentIds: string[];
+  createdAt: string;
+};
+
 export type UserProfile = {
   practiceId: string;
   role: "dentist";

@@ -1127,12 +1127,12 @@ function ensureSpace(ctx: DrawCtx, needed: number) {
 
 /** Draw the full practice header (for page 1) */
 function drawPracticeHeader(ctx: DrawCtx) {
-  const { boldFont, font, settings } = ctx;
+  const { boldFont, font } = ctx;
 
-  // Logo image centered at top
+  // Logo image centered at top — large
   if (ctx.logoImage) {
-    const logoDims = ctx.logoImage.scale(0.25);
-    const logoW = Math.min(logoDims.width, 300);
+    const logoDims = ctx.logoImage.scale(0.4);
+    const logoW = Math.min(logoDims.width, 400);
     const logoH = (logoW / logoDims.width) * logoDims.height;
     ctx.page.drawImage(ctx.logoImage, {
       x: (PAGE_W - logoW) / 2,
@@ -1140,56 +1140,40 @@ function drawPracticeHeader(ctx: DrawCtx) {
       width: logoW,
       height: logoH,
     });
-    ctx.y -= logoH + 8;
+    ctx.y -= logoH + 10;
   }
 
-  // Practice name - 13pt bold green centered
-  const practiceName = cleanText(
-    settings.name || "Dr Sheryl Smithies BChD (PRET)"
-  );
-  drawCenteredText(ctx, practiceName, {
-    size: 13,
+  // Practice details — always show the hardcoded details below logo
+  drawCenteredText(ctx, cleanText("Dr Sheryl Smithies BChD (PRET)"), {
+    size: 10,
     font: boldFont,
-    color: GREEN,
+    color: DARK,
   });
 
-  // Phone - 8pt gray centered
-  if (settings.phone) {
-    drawCenteredText(ctx, cleanText(`T: ${settings.phone}`), {
-      size: 8,
-      font,
-      color: GRAY,
-    });
-  }
+  drawCenteredText(ctx, cleanText("T: +27 (0) 21 418 2048"), {
+    size: 8,
+    font,
+    color: GRAY,
+  });
 
-  // Practice number / VAT - 8pt gray centered
-  if (settings.vatNumber) {
-    drawCenteredText(
-      ctx,
-      cleanText(
-        `Practice Number: ${settings.vatNumber}. VAT ${settings.vatNumber}`
-      ),
-      { size: 8, font, color: GRAY }
-    );
-  }
+  drawCenteredText(ctx, cleanText("Practice Number: 0640867.    VAT 4250276690"), {
+    size: 8,
+    font,
+    color: GRAY,
+  });
 
-  // Phone again - 8pt gray centered
-  if (settings.phone) {
-    drawCenteredText(ctx, cleanText(`t: ${settings.phone}`), {
-      size: 8,
-      font,
-      color: GRAY,
-    });
-  }
+  drawCenteredText(ctx, cleanText("t: +27 (0) 21 418 2048"), {
+    size: 8,
+    font,
+    color: GRAY,
+  });
 
-  // Email - 8pt gray centered
-  if (settings.email) {
-    drawCenteredText(ctx, cleanText(`e: ${settings.email}`), {
-      size: 8,
-      font,
-      color: GRAY,
-    });
-  }
+  drawCenteredText(ctx, cleanText("e: nikita@enamel.clinic"), {
+    size: 8,
+    font,
+    color: GRAY,
+  });
+
 }
 
 /** Draw a small header on continuation pages */

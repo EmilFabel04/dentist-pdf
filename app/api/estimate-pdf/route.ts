@@ -910,34 +910,23 @@ function drawPage3(
       );
       if (treatmentTCRows.has(displayName)) continue;
 
-      const rawTC = st.treatment.termsAndConditions.replace(/---/g, "").trim();
+      // Take only the first T&C block (before the --- separator)
+      const firstBlock = st.treatment.termsAndConditions.split("---")[0].trim();
 
-      // Parse out warranty info (e.g. "Warranty: 3 years" or "Warranty: N/A")
+      // Extract warranty
       let warranty = "";
-      const warrantyMatch = rawTC.match(/Warranty\s*:\s*([^\n.]+)/i);
+      const warrantyMatch = firstBlock.match(/Warranty\s*:\s*([^\n]+)/i);
       if (warrantyMatch) {
         warranty = warrantyMatch[1].trim();
       }
 
-      // Split into What to Expect and Terms and Conditions sections
-      let whatToExpect = "";
-      let termsText = "";
+      // Remove warranty line from text
+      const textWithoutWarranty = firstBlock.replace(/Warranty\s*:\s*[^\n]*/i, "").trim();
 
-      // Try to split on "Terms and Conditions" or "T&C" markers
-      const tcSplitRegex = /Terms\s+and\s+Conditions\s*:/i;
-      const parts = rawTC.split(tcSplitRegex);
-      if (parts.length >= 2) {
-        whatToExpect = parts[0].replace(/What\s+to\s+Expect\s*(and\s+Aftercare)?\s*:/i, "").trim();
-        termsText = parts[1].replace(/Warranty\s*:\s*[^\n.]*/i, "").trim();
-      } else {
-        // If no split marker, use the whole text as whatToExpect
-        whatToExpect = rawTC.replace(/Warranty\s*:\s*[^\n.]*/i, "").trim();
-        termsText = "";
-      }
-
-      // Remove trailing/leading punctuation artefacts
-      whatToExpect = whatToExpect.replace(/^[-\s]+|[-\s]+$/g, "").trim();
-      termsText = termsText.replace(/^[-\s]+|[-\s]+$/g, "").trim();
+      // Split on newline — first paragraph is "What to Expect", second is "Terms"
+      const paragraphs = textWithoutWarranty.split("\n").map(p => p.trim()).filter(Boolean);
+      const whatToExpect = paragraphs[0] || "";
+      const termsText = paragraphs.slice(1).join(" ") || "";
 
       treatmentTCRows.set(displayName, {
         whatToExpect: cleanText(whatToExpect),
